@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Database Management Interface{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/loading-states.js"></script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <header class="app-header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <div class="logo-icon">DB</div>
+                        <span class="logo-text">DataConsole</span>
+                    </div>
+                    
+                    <nav class="main-nav">
+                        <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
+                            <span class="icon">📊</span>
+                            Dashboard
+                        </a>
+                        <a href="/tables" class="nav-link {% if 'tables' in request.url.path %}active{% endif %}">
+                            <span class="icon">🗃️</span>
+                            Data Tables
+                        </a>
+                        <a href="/query" class="nav-link {% if 'query' in request.url.path %}active{% endif %}">
+                            <span class="icon">🔍</span>
+                            Query Console
+                        </a>
+                        <a href="/tools" class="nav-link {% if 'tools' in request.url.path %}active{% endif %}">
+                            <span class="icon">🛠️</span>
+                            Database Tools
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="container">
+                <div class="footer-content">
+                    <div class="footer-links">
+                        <a href="/api/status" class="footer-link">API Status</a>
+                        <a href="/health" class="footer-link">Health Check</a>
+                        <a href="https://github.com" class="footer-link" target="_blank">GitHub</a>
+                        <a href="#" class="footer-link">Documentation</a>
+                    </div>
+                    <p class="copyright">
+                        &copy; 2024 DataConsole. Database Management Interface v2.0.0
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DataConsole{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <h1>Database Management Console</h1>
+        <p>Comprehensive interface for managing your PostgreSQL databases with advanced tools and real-time monitoring</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="stat-card blue">
+            <h3>Database Tables</h3>
+            <div class="stat-value">{{ total_tables }}</div>
+            <p class="stat-description">Total tables in the current database</p>
+            <a href="/tables" class="btn btn-primary">
+                <span class="icon">📋</span>
+                View All Tables
+            </a>
+        </div>
+
+        <div class="stat-card green">
+            <h3>Query Console</h3>
+            <div class="stat-value">SQL</div>
+            <p class="stat-description">Execute and analyze SQL queries with advanced editor</p>
+            <a href="/query" class="btn btn-success">
+                <span class="icon">⚡</span>
+                Open Console
+            </a>
+        </div>
+
+        <div class="stat-card amber">
+            <h3>Database Tools</h3>
+            <div class="stat-value">🛠️</div>
+            <p class="stat-description">Backup, restore, export and archive operations</p>
+            <a href="/tools" class="btn btn-warning">
+                <span class="icon">🔧</span>
+                Access Tools
+            </a>
+        </div>
+
+        <div class="stat-card purple">
+            <h3>System Status</h3>
+            <div class="stat-value">✅</div>
+            <p class="stat-description">All systems operational and connected</p>
+            <button onclick="checkSystemStatus()" class="btn btn-secondary">
+                <span class="icon">🔄</span>
+                Refresh Status
+            </button>
+        </div>
+    </div>
+
+    <section class="tables-section mt-2">
+        <div class="section-header">
+            <h2>Database Tables Overview</h2>
+            <div class="table-actions">
+                <button onclick="exportAllTables()" class="btn btn-sm btn-secondary">
+                    <span class="icon">📥</span>
+                    Export All
+                </button>
+                <button onclick="refreshTables()" class="btn btn-sm btn-secondary">
+                    <span class="icon">🔄</span>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        {% if tables %}
+        <div class="tables-grid">
+            {% for table in tables %}
+            <div class="table-item slide-in">
+                <h4>{{ table }}</h4>
+                <p>PostgreSQL table with structured data format</p>
+                <div class="table-meta">
+                    <span class="table-count">{{ table_stats.get(table, 0) }} records</span>
+                    <div class="table-actions">
+                        <a href="/tables?table={{ table }}" class="btn btn-sm btn-primary">
+                            View
+                        </a>
+                        <a href="/query?table={{ table }}" class="btn btn-sm btn-secondary">
+                            Query
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="message info">
+            <p>No tables found in the database. The database might be empty or not properly connected.</p>
+            <button onclick="checkDatabaseConnection()" class="btn btn-sm btn-primary mt-2">
+                Check Connection
+            </button>
+        </div>
+        {% endif %}
+    </section>
+
+    <div class="results-panel hidden" id="statusPanel">
+        <div class="results-header">
+            <h3>System Status</h3>
+            <button onclick="closeStatusPanel()" class="btn btn-sm btn-secondary">Close</button>
+        </div>
+        <div id="statusContent"></div>
+    </div>
+</div>
+
+<script>
+async function checkSystemStatus() {
+    const panel = document.getElementById('statusPanel');
+    const content = document.getElementById('statusContent');
+    
+    content.innerHTML = '<div class="message loading">Checking system status...</div>';
+    panel.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            content.innerHTML = `
+                <div class="message success">
+                    <strong>✅ System Operational</strong>
+                    <p>${data.message}</p>
+                    <pre class="mt-2">${JSON.stringify(data.data, null, 2)}</pre>
+                </div>
+            `;
+        } else {
+            content.innerHTML = `
+                <div class="message error">
+                    <strong>⚠️ System Issue Detected</strong>
+                    <p>${data.error || 'Unknown error occurred'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        content.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Failed</strong>
+                <p>Unable to reach the server: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function closeStatusPanel() {
+    document.getElementById('statusPanel').classList.add('hidden');
+}
+
+async function exportAllTables() {
+    if (confirm('Export all tables to Excel format? This may take a moment for large databases.')) {
+        window.open('/api/export/all/excel', '_blank');
+    }
+}
+
+async function refreshTables() {
+    const panel = document.getElementById('statusPanel');
+    const content = document.getElementById('statusContent');
+    
+    content.innerHTML = '<div class="message loading">Refreshing table list...</div>';
+    panel.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/api/tables');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            content.innerHTML = `
+                <div class="message success">
+                    <strong>✅ Refresh Complete</strong>
+                    <p>Found ${data.data.tables.length} tables in the database</p>
+                </div>
+            `;
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            content.innerHTML = `
+                <div class="message error">
+                    <strong>⚠️ Refresh Failed</strong>
+                    <p>${data.error || 'Unknown error occurred'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        content.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Failed</strong>
+                <p>Unable to refresh tables: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+async function checkDatabaseConnection() {
+    const panel = document.getElementById('statusPanel');
+    const content = document.getElementById('statusContent');
+    
+    content.innerHTML = '<div class="message loading">Testing database connection...</div>';
+    panel.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        
+        if (data.status === 'healthy') {
+            content.innerHTML = `
+                <div class="message success">
+                    <strong>✅ Database Connected</strong>
+                    <p>Connection to PostgreSQL database is active and healthy</p>
+                    <pre class="mt-2">${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            content.innerHTML = `
+                <div class="message warning">
+                    <strong>⚠️ Connection Issue</strong>
+                    <p>Database connection may have problems</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        content.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Failed</strong>
+                <p>Cannot establish database connection: ${error.message}</p>
+                <p class="mt-2">Please check if the database service is running.</p>
+            </div>
+        `;
+    }
+}
+</script>
+{% endblock %}

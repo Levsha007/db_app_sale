@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Error - DataConsole{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 4rem auto;">
+    <div class="fade-in">
+        <div class="stat-card" style="text-align: center;">
+            <div class="tool-icon" style="margin: 0 auto 2rem; background: linear-gradient(135deg, var(--accent-red), #f87171);">
+                ⚠️
+            </div>
+            
+            <h1 style="color: var(--accent-red); margin-bottom: 1rem;">
+                Database Connection Error
+            </h1>
+            
+            <div class="message error" style="text-align: left;">
+                <p><strong>Error Details:</strong></p>
+                <pre style="white-space: pre-wrap; margin: 1rem 0; padding: 1rem; background: var(--surface-alt); border-radius: 6px;">{{ error }}</pre>
+            </div>
+            
+            <p style="margin: 2rem 0; color: var(--text-secondary);">
+                Unable to establish connection to the PostgreSQL database. Please check the following:
+            </p>
+            
+            <div class="tool-warning" style="text-align: left;">
+                <ul style="margin-left: 1.5rem;">
+                    <li>Database service is running</li>
+                    <li>Connection parameters are correct</li>
+                    <li>Network connectivity to database host</li>
+                    <li>Database credentials are valid</li>
+                </ul>
+            </div>
+            
+            <div class="btn-group" style="margin-top: 2rem;">
+                <a href="/" class="btn btn-primary">
+                    <span class="icon">🏠</span>
+                    Return to Dashboard
+                </a>
+                <button onclick="location.reload()" class="btn btn-secondary">
+                    <span class="icon">🔄</span>
+                    Retry Connection
+                </button>
+            </div>
+            
+            <div class="message info" style="margin-top: 2rem; font-size: 0.875rem;">
+                <p><strong>Technical Information:</strong></p>
+                <p>Service: PostgreSQL Database Management Interface</p>
+                <p>Timestamp: <span id="timestamp"></span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('timestamp').textContent = new Date().toLocaleString();
+</script>
+{% endblock %}

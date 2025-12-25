@@ -1,0 +1,435 @@
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ============================================
+# Operating System Files
+# ============================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+
+# ============================================
+# IDE Files
+# ============================================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# PyCharm
+.idea/
+.idea/*.xml
+.idea/*.iml
+.idea/codeStyles/
+.idea/inspectionProfiles/
+*.ipr
+*.iws
+*.iml
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Notepad++
+*.sessions/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Visual Studio Code
+.history
+.vscode/
+
+# ============================================
+# Database Files
+# ============================================
+# PostgreSQL
+*.pid
+*.postgresql
+postmaster.pid
+postmaster.opts
+pgdata/
+pg_stat_tmp/
+postgresql_data/
+postgresql.conf
+pg_hba.conf
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# MySQL
+*.frm
+*.myd
+*.myi
+*.ibd
+ib_logfile*
+
+# MongoDB
+mongod.lock
+*.ns
+
+# ============================================
+# Backup and Temporary Files
+# ============================================
+# Backup files
+*.bak
+*.bkp
+backup_*.sql
+backup_*.dump
+dump.sql
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+.temp/
+.tmp/
+
+# Autosave files
+*_autosave.*
+
+# ============================================
+# Application Specific
+# ============================================
+# Project specific - Игнорируем создаваемые директории на корневом уровне
+backups/
+backup/
+archive/
+archives/
+export/
+exports/
+logs/
+log/
+
+# Backup files from pg_dump
+backup_*.sql
+restore_*.sql
+temp_*.sql
+
+# Environment files (except example/template)
+.env
+.env.local
+.env.*.local
+.secrets
+.env.production
+.env.staging
+
+# Keep example env files
+!.env.example
+!.env.sample
+!.env.template
+
+# Application logs
+*.log
+
+# Session files
+session_*
+flask_session/
+
+# Cache
+.cache/
+
+# ============================================
+# Docker
+# ============================================
+# Docker
+docker-compose.override.yml
+
+# ============================================
+# Testing and Coverage
+# ============================================
+# Coverage reports
+.coverage
+.coverage.*
+cover/
+htmlcov/
+
+# pytest
+.pytest_cache/
+.pytest/
+
+# ============================================
+# Virtual Environments
+# ============================================
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Python virtual environment
+*.venv
+venv*/
+env*/
+ENV*/
+
+# Conda
+.conda/
+conda/
+
+# Poetry
+.poetry/
+
+# ============================================
+# Package Management
+# ============================================
+# Pip
+pip-selfcheck.json
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# PyPI
+.pypirc
+
+# ============================================
+# Documentation
+# ============================================
+# MkDocs
+site/
+
+# Sphinx
+_build/
+_static/
+_templates/
+
+# ============================================
+# Security
+# ============================================
+# Security files
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+*.p7b
+*.p7c
+*.spc
+*.crl
+*.csr
+*.der
+secret.txt
+credentials.json
+service-account.json
+
+# ============================================
+# Development
+# ============================================
+# Development tools
+.fleet/
+.zed/
+
+# ============================================
+# OS Generated
+# ============================================
+# OS generated files
+.DS_Store*
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# Project Specific
+# ============================================
+# PostgreSQL dumps (автоматически создаваемые)
+*.dump
+*.pgdump
+
+# Временные файлы экспорта
+export_*.csv
+export_*.json
+export_*.xlsx
+
+# Файлы загрузок
+*.upload
+*.download
+
+# Локальные настройки
+local_settings.py
+settings_local.py
+config_local.py
+
+# ============================================
+# Важные пояснения:
+# ============================================
+
+# Ваши папки static и templates в папке app/ НЕ будут проигнорированы,
+# потому что правила выше не указывают на них.
+
+# Файлы в папке app/:
+# - app/main.py - сохранится
+# - app/database.py - сохранится  
+# - app/requirements.txt - сохранится
+# - app/static/ - сохранится
+# - app/templates/ - сохранится
+
+# Игнорируемые директории (в корне проекта):
+# - backups/ - создается автоматически
+# - exports/ - создается автоматически
+# - archives/ - создается автоматически
+
+# Для проверки, что файлы не игнорируются, используйте:
+# git status --ignored
+# или
+# git check-ignore -v путь/к/файлу

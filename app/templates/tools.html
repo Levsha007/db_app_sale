@@ -1,0 +1,613 @@
+{% extends "base.html" %}
+
+{% block title %}Database Tools - DataConsole{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="page-header">
+        <h1>Database Management Tools</h1>
+        <p>Comprehensive suite of tools for database maintenance, backup, and data operations</p>
+    </div>
+
+    <div class="tools-grid">
+        <!-- Backup Tool -->
+        <div class="tool-card backup">
+            <div class="tool-header">
+                <div class="tool-icon">💾</div>
+                <div>
+                    <h2 class="tool-title">Database Backup</h2>
+                    <p class="tool-description">Create complete database backup in PostgreSQL format</p>
+                </div>
+            </div>
+            
+            <div class="tool-info">
+                <p><strong>Format:</strong> PostgreSQL .backup (binary)</p>
+                <p><strong>Storage:</strong> backups/YYYYMMDD_HHMMSS/</p>
+                <p><strong>Includes:</strong> All tables, data, and schema</p>
+            </div>
+            
+            <button onclick="createBackup()" class="btn btn-primary w-full">
+                <span class="icon">💾</span>
+                Create Full Backup
+            </button>
+            
+            <div class="results mt-2" id="backupResult"></div>
+        </div>
+
+        <!-- Restore Tool -->
+        <div class="tool-card restore">
+            <div class="tool-header">
+                <div class="tool-icon">🔄</div>
+                <div>
+                    <h2 class="tool-title">Restore Database</h2>
+                    <p class="tool-description">Restore database from backup file</p>
+                </div>
+            </div>
+            
+            <div class="tool-warning danger">
+                <p><strong>⚠️ WARNING:</strong> This will replace ALL current data with backup data</p>
+                <p>Irreversible operation - proceed with caution</p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Select Backup File</label>
+                <input type="file" id="backupFile" accept=".backup" class="form-control">
+                <span class="form-hint">Only PostgreSQL .backup files are supported</span>
+            </div>
+            
+            <button onclick="restoreBackup()" class="btn btn-warning w-full">
+                <span class="icon">⚠️</span>
+                Restore Database
+            </button>
+            
+            <div class="results mt-2" id="restoreResult"></div>
+        </div>
+
+        <!-- Export Tool -->
+        <div class="tool-card export">
+            <div class="tool-header">
+                <div class="tool-icon">📤</div>
+                <div>
+                    <h2 class="tool-title">Data Export</h2>
+                    <p class="tool-description">Export tables to various formats</p>
+                </div>
+            </div>
+            
+            <div class="tool-info">
+                <p><strong>Supported Formats:</strong> Excel (.xlsx), JSON (.json)</p>
+                <p><strong>Storage:</strong> exports/YYYYMMDD_HHMMSS/</p>
+                <p><strong>Limit:</strong> 50,000 rows per table</p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Select Tables to Export</label>
+                <select id="exportTables" multiple class="form-control" style="height: 120px;">
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+                <span class="form-hint">Hold Ctrl/Cmd to select multiple tables</span>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Export Format</label>
+                <select id="exportFormat" class="form-control">
+                    <option value="excel">Excel Spreadsheet (.xlsx)</option>
+                    <option value="json">JSON Document (.json)</option>
+                </select>
+            </div>
+            
+            <div class="btn-group">
+                <button onclick="exportSelectedTables()" class="btn btn-success flex-1">
+                    <span class="icon">📥</span>
+                    Export Selected
+                </button>
+                <button onclick="exportAllTables()" class="btn btn-secondary flex-1">
+                    <span class="icon">📦</span>
+                    Export All
+                </button>
+            </div>
+        </div>
+
+        <!-- Archive Tool -->
+        <div class="tool-card archive">
+            <div class="tool-header">
+                <div class="tool-icon">📦</div>
+                <div>
+                    <h2 class="tool-title">Table Archiving</h2>
+                    <p class="tool-description">Archive tables with complete data preservation</p>
+                </div>
+            </div>
+            
+            <div class="tool-warning">
+                <p><strong>⚠️ IMPORTANT:</strong> Tables will be removed from database after archiving</p>
+                <p>Creates backup, Excel, and JSON files before deletion</p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Select Tables to Archive</label>
+                <select id="archiveTables" multiple class="form-control" style="height: 120px;">
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+                <span class="form-hint">Hold Ctrl/Cmd to select multiple tables</span>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="archiveAllFlag">
+                <label for="archiveAllFlag" class="form-label">Archive ALL Tables</label>
+            </div>
+            
+            <button onclick="archiveTables()" class="btn btn-warning w-full">
+                <span class="icon">📦</span>
+                Archive Selected Tables
+            </button>
+            
+            <div class="results mt-2" id="archiveResult"></div>
+        </div>
+
+        <!-- Delete Tool -->
+        <div class="tool-card delete">
+            <div class="tool-header">
+                <div class="tool-icon">🗑️</div>
+                <div>
+                    <h2 class="tool-title">Table Deletion</h2>
+                    <p class="tool-description">Permanently remove tables from database</p>
+                </div>
+            </div>
+            
+            <div class="tool-warning danger">
+                <p><strong>⚠️ DANGER:</strong> This action is permanent and cannot be undone</p>
+                <p>All table data will be permanently lost</p>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Select Table to Delete</label>
+                <select id="deleteTable" class="form-control">
+                    <option value="">Choose a table...</option>
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button onclick="deleteTable()" class="btn btn-danger w-full">
+                <span class="icon">⚠️</span>
+                Delete Table Permanently
+            </button>
+        </div>
+
+        <!-- File Browser -->
+        <div class="tool-card">
+            <div class="tool-header">
+                <div class="tool-icon">📁</div>
+                <div>
+                    <h2 class="tool-title">File Browser</h2>
+                    <p class="tool-description">Browse generated backup and export files</p>
+                </div>
+            </div>
+            
+            <div class="tool-info">
+                <p><strong>Available Directories:</strong></p>
+                <ul>
+                    <li><strong>backups/</strong> - Database backup files</li>
+                    <li><strong>exports/</strong> - Data export files</li>
+                    <li><strong>archives/</strong> - Archived table files</li>
+                </ul>
+            </div>
+            
+            <div class="btn-group">
+                <button onclick="browseFiles('backups')" class="btn btn-secondary flex-1">
+                    View Backups
+                </button>
+                <button onclick="browseFiles('exports')" class="btn btn-secondary flex-1">
+                    View Exports
+                </button>
+                <button onclick="browseFiles('archives')" class="btn btn-secondary flex-1">
+                    View Archives
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="results-panel hidden" id="fileBrowser">
+        <div class="results-header">
+            <h3>File Browser</h3>
+            <button onclick="closeFileBrowser()" class="btn btn-sm btn-secondary">Close</button>
+        </div>
+        <div id="fileBrowserContent"></div>
+    </div>
+</div>
+
+<script>
+async function createBackup() {
+    if (!confirm('Create a complete database backup? This may take several minutes for large databases.')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('backupResult');
+    resultDiv.innerHTML = '<div class="message loading">Creating database backup...</div>';
+    
+    try {
+        const response = await fetch('/api/backup/create', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            resultDiv.innerHTML = `
+                <div class="message success">
+                    <strong>✅ Backup Created Successfully</strong>
+                    <p>${data.message}</p>
+                    <p class="mt-2"><strong>Backup file:</strong> ${data.data.backup_path}</p>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="message error">
+                    <strong>❌ Backup Failed</strong>
+                    <p>${data.error}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Error</strong>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+async function restoreBackup() {
+    const fileInput = document.getElementById('backupFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a backup file');
+        return;
+    }
+    
+    const warning = `
+⚠️ CRITICAL WARNING ⚠️
+
+You are about to RESTORE the ENTIRE DATABASE from backup.
+
+This will:
+1. DELETE ALL current data and tables
+2. Replace everything with backup data
+3. This operation is IRREVERSIBLE
+
+Are you absolutely sure you want to continue?`;
+    
+    if (!confirm(warning)) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('restoreResult');
+    resultDiv.innerHTML = '<div class="message loading">Restoring database from backup...</div>';
+    
+    const formData = new FormData();
+    formData.append('backup_file', file);
+    
+    try {
+        const response = await fetch('/api/backup/restore', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            resultDiv.innerHTML = `
+                <div class="message success">
+                    <strong>✅ Database Restored Successfully</strong>
+                    <p>${data.message}</p>
+                    <p class="mt-2">Page will refresh in 5 seconds...</p>
+                </div>
+            `;
+            setTimeout(() => location.reload(), 5000);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="message error">
+                    <strong>❌ Restore Failed</strong>
+                    <p>${data.error}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Error</strong>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+async function exportSelectedTables() {
+    const select = document.getElementById('exportTables');
+    const format = document.getElementById('exportFormat').value;
+    const tables = [];
+    
+    for (let option of select.options) {
+        if (option.selected) {
+            tables.push(option.value);
+        }
+    }
+    
+    if (tables.length === 0) {
+        alert('Please select at least one table to export');
+        return;
+    }
+    
+    const formData = new FormData();
+    tables.forEach(table => {
+        formData.append('tables', table);
+    });
+    formData.append('format', format);
+    
+    try {
+        const response = await fetch('/api/export/tables', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `export_${new Date().toISOString().slice(0,10)}`;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            const result = await response.json();
+            alert(`Export failed: ${result.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Export error: ${error.message}`);
+    }
+}
+
+function exportAllTables() {
+    const format = document.getElementById('exportFormat').value;
+    
+    if (confirm(`Export ALL tables to ${format.toUpperCase()} format? This may take a moment.`)) {
+        window.open(`/api/export/all/${format}`, '_blank');
+    }
+}
+
+async function archiveTables() {
+    const archiveAll = document.getElementById('archiveAllFlag').checked;
+    let tables = [];
+    
+    if (!archiveAll) {
+        const select = document.getElementById('archiveTables');
+        for (let option of select.options) {
+            if (option.selected) {
+                tables.push(option.value);
+            }
+        }
+        
+        if (tables.length === 0) {
+            alert('Please select tables to archive');
+            return;
+        }
+    }
+    
+    const message = archiveAll 
+        ? '⚠️ ARCHIVE ALL TABLES?\n\nThis will:\n1. Create backups of ALL tables\n2. Export ALL tables to files\n3. DELETE ALL tables from database\n\nThis operation is IRREVERSIBLE.\n\nContinue?'
+        : `Archive ${tables.length} selected tables?\n\nThis will create backups and exports, then remove tables from database.\n\nContinue?`;
+    
+    if (!confirm(message)) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('archiveResult');
+    resultDiv.innerHTML = '<div class="message loading">Archiving tables...</div>';
+    
+    const formData = new FormData();
+    formData.append('archive_all_flag', archiveAll);
+    formData.append('tables_to_archive', JSON.stringify(tables));
+    
+    try {
+        const response = await fetch('/api/archive/tables', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            let resultHTML = '<div class="message success">';
+            resultHTML += `<strong>✅ Archiving Completed</strong>`;
+            resultHTML += `<p>${data.message}</p>`;
+            resultHTML += `<p class="mt-2"><strong>Tables processed:</strong> ${data.data.tables_processed}/${data.data.total_tables}</p>`;
+            resultHTML += `<p><strong>Archive directory:</strong> ${data.data.archive_directory}</p>`;
+            
+            if (data.data.details && data.data.details.length > 0) {
+                resultHTML += '<div class="mt-2"><strong>Details:</strong><ul>';
+                data.data.details.forEach(detail => {
+                    if (typeof detail === 'object' && detail.table) {
+                        resultHTML += `<li>${detail.table}: ${detail.rows_archived || 0} rows archived</li>`;
+                    } else if (typeof detail === 'string') {
+                        resultHTML += `<li>${detail}</li>`;
+                    }
+                });
+                resultHTML += '</ul></div>';
+            }
+            
+            resultHTML += '</div>';
+            resultDiv.innerHTML = resultHTML;
+            
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="message error">
+                    <strong>❌ Archiving Failed</strong>
+                    <p>${data.error}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="message error">
+                <strong>❌ Connection Error</strong>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+async function deleteTable() {
+    const table = document.getElementById('deleteTable').value;
+    
+    if (!table) {
+        alert('Please select a table to delete');
+        return;
+    }
+    
+    const warning = `
+⚠️ PERMANENT DELETION ⚠️
+
+You are about to PERMANENTLY DELETE the table "${table}"
+
+This will:
+1. DELETE ALL data in the table
+2. REMOVE the table from database
+3. This action is IRREVERSIBLE
+
+Are you absolutely sure?`;
+    
+    if (!confirm(warning)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('table', table);
+    
+    try {
+        const response = await fetch(`/api/tables/${table}`, {
+            method: 'DELETE',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert(`✅ ${data.message}`);
+            location.reload();
+        } else {
+            alert(`❌ ${data.error}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+async function browseFiles(category) {
+    const panel = document.getElementById('fileBrowser');
+    const content = document.getElementById('fileBrowserContent');
+    
+    panel.classList.remove('hidden');
+    content.innerHTML = '<div class="message loading">Loading files...</div>';
+    
+    let endpoint;
+    let title;
+    
+    switch (category) {
+        case 'backups':
+            endpoint = '/api/files/backups';
+            title = 'Backup Files';
+            break;
+        case 'exports':
+            endpoint = '/api/files/exports';
+            title = 'Export Files';
+            break;
+        case 'archives':
+            endpoint = '/api/files/archives';
+            title = 'Archive Files';
+            break;
+    }
+    
+    try {
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            let filesHTML = `<div class="message info"><h4>${title}</h4>`;
+            
+            if (data.data.files && data.data.files.length > 0) {
+                filesHTML += '<table class="data-table mt-2">';
+                filesHTML += '<thead><tr><th>File</th><th>Folder</th><th>Size</th><th>Modified</th><th>Action</th></tr></thead>';
+                filesHTML += '<tbody>';
+                
+                data.data.files.forEach(file => {
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    const date = new Date(file.modified).toLocaleString();
+                    
+                    filesHTML += `<tr>
+                        <td><strong>${file.name}</strong></td>
+                        <td><code>${file.folder}</code></td>
+                        <td>${sizeMB} MB</td>
+                        <td>${date}</td>
+                        <td>
+                            <button onclick="downloadFile('${category}', '${file.name}')" 
+                                    class="btn btn-sm btn-primary">
+                                Download
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+                
+                filesHTML += '</tbody></table>';
+            } else {
+                filesHTML += '<p class="mt-2">No files found in this category.</p>';
+            }
+            
+            filesHTML += '</div>';
+            content.innerHTML = filesHTML;
+        } else {
+            content.innerHTML = `
+                <div class="message error">
+                    <strong>Failed to load files</strong>
+                    <p>${data.error || 'Unknown error'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        content.innerHTML = `
+            <div class="message error">
+                <strong>Connection error</strong>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function downloadFile(category, filename) {
+    window.open(`/api/download/${category}/${filename}`, '_blank');
+}
+
+function closeFileBrowser() {
+    document.getElementById('fileBrowser').classList.add('hidden');
+}
+</script>
+{% endblock %}
