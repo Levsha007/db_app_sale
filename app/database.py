@@ -22,7 +22,7 @@ class Database:
             'password': os.getenv('DB_PASSWORD', 'postgres'),
             'port': os.getenv('DB_PORT', '5432')
         }
-        # Путь к утилитам PostgreSQL (в Docker они в PATH)
+        # Путь к утилитам PostgreSQL
         self.pg_dump_path = "pg_dump"
         self.pg_restore_path = "pg_restore"
         
@@ -85,14 +85,18 @@ class Database:
     
     def get_tables(self):
         """Получить список всех таблиц"""
-        query = """
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-            ORDER BY table_name
-        """
-        result = self.execute_query(query)
-        return [row['table_name'] for row in result] if result else []
+        try:
+            query = """
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """
+            result = self.execute_query(query)
+            return [row['table_name'] for row in result] if result else []
+        except Exception as e:
+            print(f"Ошибка при получении таблиц: {e}")
+            return []
     
     def get_table_columns(self, table_name):
         """Получить колонки таблицы"""
@@ -102,7 +106,7 @@ class Database:
             WHERE table_name = %s
             ORDER BY ordinal_position
         """
-        return self.execute_query(query, (table_name,))
+        return self.execute_query(query, (table_name,)) or []
     
     def get_table_constraints(self, table_name):
         """Получить информацию о внешних ключах таблицы"""
@@ -123,7 +127,7 @@ class Database:
             AND tc.constraint_type IN ('FOREIGN KEY', 'PRIMARY KEY')
             ORDER BY tc.constraint_type, kcu.ordinal_position;
         """
-        return self.execute_query(query, (table_name,))
+        return self.execute_query(query, (table_name,)) or []
     
     def get_referencing_tables(self, table_name, column_name=None):
         """Получить таблицы, которые ссылаются на данную таблицу"""
@@ -142,30 +146,42 @@ class Database:
             AND ccu.table_name = %s
             AND (%s IS NULL OR ccu.column_name = %s)
         """
-        return self.execute_query(query, (table_name, column_name, column_name))
+        return self.execute_query(query, (table_name, column_name, column_name)) or []
     
     def get_table_data(self, table_name, limit=None, offset=0):
         """Получить данные из таблицы"""
-        if limit:
-            query = f"SELECT * FROM {table_name} LIMIT %s OFFSET %s"
-            return self.execute_query(query, (limit, offset))
-        else:
-            query = f"SELECT * FROM {table_name}"
-            return self.execute_query(query)
+        try:
+            if limit:
+                query = f"SELECT * FROM {table_name} LIMIT %s OFFSET %s"
+                return self.execute_query(query, (limit, offset))
+            else:
+                query = f"SELECT * FROM {table_name}"
+                return self.execute_query(query)
+        except Exception as e:
+            print(f"Ошибка при получении данных таблицы {table_name}: {e}")
+            return []
     
     def get_table_count(self, table_name):
-        """Получить количество записей в таблицы"""
-        query = f"SELECT COUNT(*) as count FROM {table_name}"
-        result = self.execute_query(query)
-        return result[0]['count'] if result else 0
+        """Получить количество записей в таблице"""
+        try:
+            query = f"SELECT COUNT(*) as count FROM {table_name}"
+            result = self.execute_query(query)
+            return result[0]['count'] if result else 0
+        except Exception as e:
+            print(f"Ошибка при подсчете записей таблицы {table_name}: {e}")
+            return 0
     
     def insert_data(self, table_name, data):
         """Вставить данные в таблицу"""
-        columns = ', '.join(data.keys())
-        placeholders = ', '.join(['%s'] * len(data))
-        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING id"
-        result = self.execute_query(query, tuple(data.values()))
-        return result[0]['id'] if result else None
+        try:
+            columns = ', '.join(data.keys())
+            placeholders = ', '.join(['%s'] * len(data))
+            query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING id"
+            result = self.execute_query(query, tuple(data.values()))
+            return result[0]['id'] if result else None
+        except Exception as e:
+            print(f"Ошибка при вставке данных в таблицу {table_name}: {e}")
+            return None
     
     def update_data(self, table_name, data, condition):
         """Обновить данные в таблице с каскадным обновлением"""
@@ -176,7 +192,7 @@ class Database:
             
             cursor = conn.cursor()
             
-            # 1. Сначала получаем старые значения для каскадного обновления
+            # Получаем старые значения для каскадного обновления
             get_old_values_query = f"SELECT * FROM {table_name} WHERE {condition}"
             cursor.execute(get_old_values_query)
             old_rows = cursor.fetchall()
@@ -190,13 +206,13 @@ class Database:
             for old_row in old_rows:
                 old_row_dict = dict(zip([desc[0] for desc in cursor.description], old_row))
                 
-                # 2. Создаем обновленный словарь данных
+                # Создаем обновленный словарь данных
                 updated_data = old_row_dict.copy()
                 for key, value in data.items():
                     if value:  # Обновляем только если передано значение
                         updated_data[key] = value
                 
-                # 3. Получаем внешние ключи для этой таблицы
+                # Получаем внешние ключи для этой таблицы
                 fk_query = """
                     SELECT
                         kcu.column_name,
@@ -213,7 +229,7 @@ class Database:
                 cursor.execute(fk_query, (table_name,))
                 foreign_keys = cursor.fetchall()
                 
-                # 4. Обновляем связанные таблицы если обновляются FK
+                # Обновляем связанные таблицы если обновляются FK
                 for fk in foreign_keys:
                     local_column = fk[0]
                     foreign_table = fk[1]
@@ -233,7 +249,7 @@ class Database:
                             """
                             cursor.execute(update_related_query, (new_value, old_value))
                 
-                # 5. Выполняем основное обновление
+                # Выполняем основное обновление
                 set_clause = ', '.join([f"{k} = %s" for k in data.keys() if data[k]])
                 values = [data[k] for k in data.keys() if data[k]]
                 
@@ -268,10 +284,10 @@ class Database:
             
             cursor = conn.cursor()
             
-            # 1. Получаем таблицы, которые ссылаются на эту таблицу
+            # Получаем таблицы, которые ссылаются на эту таблицу
             referencing_tables = self.get_referencing_tables(table_name)
             
-            # 2. Сначала удаляем из дочерних таблиц
+            # Сначала удаляем из дочерних таблиц
             for ref_table in referencing_tables:
                 ref_table_name = ref_table['referencing_table']
                 ref_column = ref_table['referencing_column']
@@ -285,7 +301,7 @@ class Database:
                 """
                 cursor.execute(delete_ref_query)
             
-            # 3. Теперь удаляем из основной таблицы
+            # Теперь удаляем из основной таблицы
             delete_query = f"DELETE FROM {table_name} WHERE {condition}"
             cursor.execute(delete_query)
             
@@ -545,15 +561,14 @@ class Database:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             backup_file = backup_dir / f"backup_{db_name}_{timestamp}.backup"
             
-            # Формируем команду pg_dump с флагом --no-unlogged-table-data
+            # Формируем команду pg_dump
             cmd = [
                 self.pg_dump_path,
                 '-h', db_host,
                 '-U', db_user,
                 '-p', db_port,
                 '-d', db_name,
-                '-F', 'c',  # custom формат (бинарный)
-                '--no-unlogged-table-data',  # Игнорировать параметры, которые могут вызывать ошибки
+                '-F', 'c',
                 '-f', str(backup_file),
                 '-v'
             ]
@@ -573,15 +588,15 @@ class Database:
             )
             
             if result.returncode == 0:
-                print(f"✅ Бэкап успешно создан: {backup_file}")
+                print(f"Бэкап успешно создан: {backup_file}")
                 return True, str(backup_file), None
             else:
-                error_msg = f"❌ Ошибка pg_dump:\n{result.stderr}\n{result.stdout}"
+                error_msg = f"Ошибка pg_dump:\n{result.stderr}\n{result.stdout}"
                 print(error_msg)
                 return False, None, error_msg
                 
         except Exception as e:
-            error_msg = f"❌ Исключение при создании бэкапа: {str(e)}"
+            error_msg = f"Исключение при создании бэкапа: {str(e)}"
             print(error_msg)
             return False, None, error_msg
     
@@ -604,7 +619,6 @@ class Database:
                 '-d', db_name,
                 '-t', table_name,
                 '-F', 'c',
-                '--no-unlogged-table-data',
                 '-f', str(backup_file),
                 '-v'
             ]
@@ -625,33 +639,32 @@ class Database:
             )
             
             if result.returncode == 0:
-                print(f"✅ Бэкап таблицы {table_name} создан: {backup_file}")
+                print(f"Бэкап таблицы {table_name} создан: {backup_file}")
                 return True, str(backup_file), None
             else:
-                error_msg = f"❌ Ошибка pg_dump для таблицы {table_name}:\n{result.stderr}\n{result.stdout}"
+                error_msg = f"Ошибка pg_dump для таблицы {table_name}:\n{result.stderr}\n{result.stdout}"
                 print(error_msg)
                 return False, None, error_msg
                 
         except Exception as e:
-            error_msg = f"❌ Исключение при создании бэкапа таблицы {table_name}: {str(e)}"
+            error_msg = f"Исключение при создании бэкапа таблицы {table_name}: {str(e)}"
             print(error_msg)
             return False, None, error_msg
     
     def restore_backup(self, backup_file):
         """
         Восстановить БД из файла .backup
-        Игнорируем ошибку transaction_timeout
         """
         try:
             if not os.path.exists(backup_file):
-                return False, f"❌ Файл не найден: {backup_file}"
+                return False, f"Файл не найден: {backup_file}"
             
             db_user = os.getenv('DB_USER', 'postgres')
             db_host = os.getenv('DB_HOST', 'postgres')
             db_port = os.getenv('DB_PORT', '5432')
             db_name = os.getenv('DB_NAME', 'my_app_db')
             
-            # Формируем команду pg_restore с флагом для игнорирования ошибок
+            # Формируем команду pg_restore
             cmd = [
                 self.pg_restore_path,
                 '-h', db_host,
@@ -680,45 +693,18 @@ class Database:
                 shell=False
             )
             
-            # Проверяем, была ли ошибка только из-за transaction_timeout
             output = result.stdout + result.stderr
             
-            # Если есть ошибка transaction_timeout, но восстановление в основном прошло успешно
-            if "unrecognized configuration parameter \"transaction_timeout\"" in output:
-                # Проверяем, что другие операции прошли успешно
-                if ("pg_restore: error" not in output or 
-                    output.count("pg_restore: error") == 1 and 
-                    "transaction_timeout" in output):
-                    
-                    print(f"⚠️  Восстановление с игнорированием ошибки transaction_timeout")
-                    print(f"✅ Данные восстановлены: {backup_file}")
-                    
-                    # Проверяем, что таблицы создались
-                    try:
-                        conn = self.get_connection()
-                        if conn:
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")
-                            table_count = cursor.fetchone()[0]
-                            conn.close()
-                            
-                            if table_count > 0:
-                                return True, "✅ Восстановление успешно выполнено (некоторые предупреждения проигнорированы)"
-                    except:
-                        pass
-                    
-                    return True, "✅ Восстановление выполнено с предупреждениями"
-            
             if result.returncode == 0:
-                print(f"✅ Восстановление успешно: {backup_file}")
-                return True, "✅ Восстановление успешно выполнено"
+                print(f"Восстановление успешно: {backup_file}")
+                return True, "Восстановление успешно выполнено"
             else:
-                error_msg = f"❌ Ошибка pg_restore:\n{result.stderr}\n{result.stdout}"
+                error_msg = f"Ошибка pg_restore:\n{result.stderr}\n{result.stdout}"
                 print(error_msg)
                 return False, error_msg
                 
         except Exception as e:
-            error_msg = f"❌ Исключение при восстановлении: {str(e)}"
+            error_msg = f"Исключение при восстановлении: {str(e)}"
             print(error_msg)
             return False, error_msg
     
@@ -805,7 +791,7 @@ class Database:
         Архивация таблиц - бэкап, экспорт в файлы и удаление из БД
         """
         try:
-            print(f"Archiving tables: {table_names}")
+            print(f"Архивация таблиц: {table_names}")
             
             if not table_names:
                 return False, "Не выбраны таблицы для архивации"
@@ -824,10 +810,10 @@ class Database:
                         results.append(f"Таблица '{table}' не существует")
                         continue
                     
-                    print(f"Starting archive for table: {table}")
+                    print(f"Начало архивации таблицы: {table}")
                     
                     # 1. Создаем бэкап таблицы
-                    print(f"Creating backup for table: {table}")
+                    print(f"Создание бэкапа таблицы: {table}")
                     backup_success, backup_file, backup_error = self.create_table_backup(table, archive_dir)
                     
                     if not backup_success:
@@ -836,7 +822,7 @@ class Database:
                         continue
                     
                     # 2. Экспортируем в Excel
-                    print(f"Exporting to Excel for table: {table}")
+                    print(f"Экспорт в Excel таблицы: {table}")
                     excel_filename = f"{table}_{datetime.now().strftime('%H%M%S')}.xlsx"
                     excel_path = archive_dir / excel_filename
                     
@@ -848,7 +834,7 @@ class Database:
                         df.to_excel(str(excel_path), index=False)
                     
                     # 3. Экспортируем в JSON
-                    print(f"Exporting to JSON for table: {table}")
+                    print(f"Экспорт в JSON таблицы: {table}")
                     json_filename = f"{table}_{datetime.now().strftime('%H%M%S')}.json"
                     json_path = archive_dir / json_filename
                     
@@ -869,7 +855,7 @@ class Database:
                         json.dump(json_data, f, ensure_ascii=False, indent=2, default=str)
                     
                     # 4. Удаляем таблицу из БД
-                    print(f"Dropping table: {table}")
+                    print(f"Удаление таблицы: {table}")
                     drop_result = self.drop_table(table)
                     
                     if drop_result:
@@ -881,16 +867,16 @@ class Database:
                             'rows_archived': row_count,
                             'status': 'success'
                         })
-                        print(f"Table {table} archived successfully")
+                        print(f"Таблица {table} успешно заархивирована")
                     else:
                         results.append(f"Ошибка при удалении таблицы '{table}'")
                         all_success = False
-                        print(f"Error dropping table {table}")
+                        print(f"Ошибка удаления таблицы {table}")
                     
                 except Exception as e:
                     import traceback
                     error_details = traceback.format_exc()
-                    print(f"Error archiving table {table}: {error_details}")
+                    print(f"Ошибка при архивации таблицы {table}: {error_details}")
                     results.append(f"Ошибка при архивации таблицы '{table}': {str(e)}")
                     all_success = False
             
@@ -934,7 +920,7 @@ class Database:
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"Exception during archiving: {error_details}")
+            print(f"Исключение при архивации: {error_details}")
             return False, f"Исключение при архивации: {str(e)}"
     
     def archive_all_tables(self):

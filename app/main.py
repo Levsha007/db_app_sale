@@ -53,51 +53,73 @@ templates = Jinja2Templates(directory="templates")
 # ==================== ГЛАВНАЯ СТРАНИЦА ====================
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    tables = db.get_tables() or []
-    table_counts = {}
-    for table in tables:
-        table_counts[table] = db.get_table_count(table)
-    
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "tables": tables,
-        "table_counts": table_counts
-    })
+    try:
+        tables = db.get_tables() or []
+        table_counts = {}
+        for table in tables:
+            table_counts[table] = db.get_table_count(table)
+        
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "tables": tables,
+            "table_counts": table_counts
+        })
+    except Exception as e:
+        print(f"Error in home route: {e}")
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "tables": [],
+            "table_counts": {}
+        })
 
 # ==================== ФОРМЫ ДЛЯ ОПЕРАЦИЙ С ДАННЫМИ ====================
 @app.get("/data", response_class=HTMLResponse)
 async def data_forms(request: Request, table: str = "", page: int = 1):
-    tables = db.get_tables() or []
-    columns = []
-    data = []
-    total_count = 0
-    total_pages = 0
-    per_page = 200
-    
-    if table and table in tables:
-        columns = db.get_table_columns(table) or []
-        total_count = db.get_table_count(table)
-        total_pages = (total_count + per_page - 1) // per_page
+    try:
+        tables = db.get_tables() or []
+        columns = []
+        data = []
+        total_count = 0
+        total_pages = 0
+        per_page = 200
         
-        if page < 1:
-            page = 1
-        if page > total_pages:
-            page = total_pages
+        if table and table in tables:
+            columns = db.get_table_columns(table) or []
+            total_count = db.get_table_count(table)
+            total_pages = (total_count + per_page - 1) // per_page
             
-        offset = (page - 1) * per_page
-        data = db.get_table_data(table, limit=per_page, offset=offset) or []
-    
-    return templates.TemplateResponse("data_forms.html", {
-        "request": request,
-        "tables": tables,
-        "current_table": table,
-        "columns": columns,
-        "data": data,
-        "page": page,
-        "per_page": per_page,
-        "total_count": total_count,
-        "total_pages": total_pages
-    })
+            if page < 1:
+                page = 1
+            if page > total_pages:
+                page = total_pages
+                
+            offset = (page - 1) * per_page
+            data = db.get_table_data(table, limit=per_page, offset=offset) or []
+        
+        return templates.TemplateResponse("data_forms.html", {
+            "request": request,
+            "tables": tables,
+            "current_table": table,
+            "columns": columns,
+            "data": data,
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+            "total_pages": total_pages
+        })
+    except Exception as e:
+        print(f"Error in data_forms route: {e}")
+        return templates.TemplateResponse("data_forms.html", {
+            "request": request,
+            "tables": [],
+            "current_table": table,
+            "columns": [],
+            "data": [],
+            "page": 1,
+            "per_page": 200,
+            "total_count": 0,
+            "total_pages": 0
+        })
 
 @app.post("/api/data/insert")
 async def insert_data(
@@ -142,7 +164,7 @@ async def update_data(
 async def delete_data(
     table: str = Form(...),
     condition: str = Form(...),
-    cascade: bool = Form(False)  # Добавляем параметр каскадного удаления
+    cascade: bool = Form(False)
 ):
     try:
         if not condition or condition.strip() == "":
@@ -211,7 +233,7 @@ async def export_table(table_name: str, format: str):
                     filename=filename
                 )
             else:
-                return {"success": False, "error": filename}  # filename содержит сообщение об ошибке
+                return {"success": False, "error": filename}
         
         elif format == "json":
             filepath, filename = db.export_table_to_json(table_name)
@@ -222,7 +244,7 @@ async def export_table(table_name: str, format: str):
                     filename=filename
                 )
             else:
-                return {"success": False, "error": filename}  # filename содержит сообщение об ошибке
+                return {"success": False, "error": filename}
         
         else:
             return {"success": False, "error": "Неподдерживаемый формат экспорта"}
@@ -233,11 +255,18 @@ async def export_table(table_name: str, format: str):
 # ==================== КОНСТРУКТОР ЗАПРОСОВ ====================
 @app.get("/query", response_class=HTMLResponse)
 async def query_builder(request: Request):
-    tables = db.get_tables() or []
-    return templates.TemplateResponse("query_builder.html", {
-        "request": request,
-        "tables": tables
-    })
+    try:
+        tables = db.get_tables() or []
+        return templates.TemplateResponse("query_builder.html", {
+            "request": request,
+            "tables": tables
+        })
+    except Exception as e:
+        print(f"Error in query_builder route: {e}")
+        return templates.TemplateResponse("query_builder.html", {
+            "request": request,
+            "tables": []
+        })
 
 @app.post("/api/query/execute")
 async def execute_query(
@@ -393,11 +422,18 @@ async def export_all_tables(format: str):
 # ==================== СЕРВИСНЫЕ ФУНКЦИИ ====================
 @app.get("/service", response_class=HTMLResponse)
 async def service_page(request: Request):
-    tables = db.get_tables() or []
-    return templates.TemplateResponse("service.html", {
-        "request": request,
-        "tables": tables
-    })
+    try:
+        tables = db.get_tables() or []
+        return templates.TemplateResponse("service.html", {
+            "request": request,
+            "tables": tables
+        })
+    except Exception as e:
+        print(f"Error in service_page route: {e}")
+        return templates.TemplateResponse("service.html", {
+            "request": request,
+            "tables": []
+        })
 
 @app.post("/api/service/backup")
 async def create_backup():
@@ -449,12 +485,6 @@ async def restore_backup(file: UploadFile = File(...)):
                 "message": message + " - страница обновится через 3 секунды..."
             }
         else:
-            # Проверяем, если ошибка только из-за transaction_timeout
-            if "unrecognized configuration parameter \"transaction_timeout\"" in message:
-                return {
-                    "success": True,
-                    "message": "Восстановление выполнено с игнорированием предупреждений - страница обновится через 3 секунды..."
-                }
             return {
                 "success": False,
                 "error": message
@@ -469,12 +499,12 @@ async def restore_backup(file: UploadFile = File(...)):
 
 @app.post("/api/service/archive")
 async def archive_tables(
-    tables: str = Form("[]"),  # Изменено: получаем как строку JSON
+    tables: str = Form("[]"),
     archive_all: bool = Form(False)
 ):
     """Архивация таблиц"""
     try:
-        print(f"Archive request: tables={tables}, archive_all={archive_all}")
+        print(f"Запрос на архивацию: tables={tables}, archive_all={archive_all}")
         
         if archive_all:
             # Архивировать все таблицы
@@ -508,7 +538,7 @@ async def archive_tables(
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Archive error: {str(e)}\n{error_details}")
+        print(f"Ошибка архивации: {str(e)}\n{error_details}")
         return {"success": False, "error": str(e)}
 
 # ==================== ЗАГРУЗКА ФАЙЛОВ ====================
