@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Сервис - DB Admin Pro{% endblock %}
+
+{% block page_title %}Сервисные функции{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Управление системой</h1>
+    <p class="page-description">Резервное копирование, восстановление, экспорт и архивация данных</p>
+</div>
+
+<div class="grid grid-3">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-download"></i> Резервное копирование</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <p><strong>Формат:</strong> PostgreSQL .backup</p>
+                <p><strong>Содержимое:</strong> Полная копия БД</p>
+                <p><strong>Хранение:</strong> backups/дата_время/</p>
+            </div>
+            <button onclick="createBackup()" class="btn btn-primary w-100">
+                <i class="fas fa-save"></i> Создать Backup
+            </button>
+            <div id="backupResult" class="mt-3"></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-upload"></i> Восстановление</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-4">
+                <p><strong>Формат:</strong> Только .backup файлы</p>
+                <p><strong>Внимание:</strong> Текущие данные будут заменены!</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Выберите файл .backup</label>
+                <input type="file" id="backupFile" accept=".backup" class="form-control">
+            </div>
+            <button onclick="restoreBackup()" class="btn btn-warning w-100">
+                <i class="fas fa-redo"></i> Восстановить БД
+            </button>
+            <div id="restoreResult" class="mt-3"></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-export"></i> Экспорт данных</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <p><strong>Форматы:</strong> Excel (.xlsx) и JSON (.json)</p>
+                <p><strong>Хранение:</strong> exports/дата_время/</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Таблицы для экспорта</label>
+                <select id="exportTables" multiple class="form-control" style="height: 120px;">
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+                <small class="form-text">Ctrl+Click для выбора нескольких</small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Формат</label>
+                <select id="exportFormat" class="form-control">
+                    <option value="excel">Excel</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="exportSelectedTables()" class="btn btn-success" style="flex: 1;">
+                    <i class="fas fa-download"></i> Экспорт
+                </button>
+                <button onclick="exportAllTables()" class="btn btn-secondary">
+                    <i class="fas fa-database"></i> Все
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2 mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-archive"></i> Архивация таблиц</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-4">
+                <p><strong>Внимание:</strong> Таблицы будут удалены после архивации!</p>
+                <p><strong>Файлы:</strong> .backup, .xlsx, .json для каждой таблицы</p>
+                <p><strong>Хранение:</strong> archives/дата_время/</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Таблицы для архивации</label>
+                <select id="archiveTables" multiple class="form-control" style="height: 150px;">
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+                <small class="form-text">Ctrl+Click для выбора нескольких</small>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="archiveAll">
+                    <span>Архивировать ВСЕ таблицы</span>
+                </label>
+            </div>
+            <button onclick="archiveTables()" class="btn btn-danger w-100">
+                <i class="fas fa-box-archive"></i> Архивировать
+            </button>
+            <div id="archiveResult" class="mt-3"></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-trash"></i> Управление таблицами</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger mb-4">
+                <p><strong>Внимание:</strong> Действие необратимо!</p>
+                <p>Все данные таблицы будут удалены безвозвратно.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Таблица для удаления</label>
+                <select id="deleteTable" class="form-control">
+                    <option value="">Выберите таблицу</option>
+                    {% for table in tables %}
+                    <option value="{{ table }}">{{ table }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button onclick="deleteTable()" class="btn btn-danger w-100">
+                <i class="fas fa-trash-alt"></i> Удалить таблицу
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function createBackup() {
+    if (!confirm('Создать полную резервную копию базы данных?')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('backupResult');
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Создание backup...</div>';
+    
+    const response = await fetch('/api/service/backup', {
+        method: 'POST'
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+        resultDiv.innerHTML = `<div class="alert alert-success">${result.message}</div>`;
+    } else {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${result.error}</div>`;
+    }
+}
+
+async function restoreBackup() {
+    const fileInput = document.getElementById('backupFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Выберите файл .backup для восстановления');
+        return;
+    }
+    
+    if (!confirm('ВНИМАНИЕ! Все текущие данные будут удалены и заменены данными из бэкапа. Продолжить?')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('restoreResult');
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Восстановление...</div>';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/api/service/restore', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+        resultDiv.innerHTML = `<div class="alert alert-success">${result.message}<br>Страница обновится через 3 секунды...</div>`;
+        setTimeout(() => location.reload(), 3000);
+    } else {
+        if (result.error.includes('transaction_timeout')) {
+            resultDiv.innerHTML = `<div class="alert alert-success">Восстановление выполнено с игнорированием предупреждений - страница обновится через 3 секунды...</div>`;
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${result.error}</div>`;
+        }
+    }
+}
+
+async function archiveTables() {
+    const archiveAll = document.getElementById('archiveAll').checked;
+    let tables = [];
+    
+    if (!archiveAll) {
+        const select = document.getElementById('archiveTables');
+        for (let option of select.options) {
+            if (option.selected) {
+                tables.push(option.value);
+            }
+        }
+        
+        if (tables.length === 0) {
+            alert('Выберите таблицы для архивации');
+            return;
+        }
+    }
+    
+    const message = archiveAll 
+        ? 'Архивировать ВСЕ таблицы? Все таблицы будут удалены из БД после экспорта!'
+        : `Архивировать выбранные таблицы?\n\nВыбрано таблиц: ${tables.length}\nТаблицы будут удалены из БД после экспорта!`;
+    
+    if (!confirm(message)) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('archiveResult');
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Архивация...</div>';
+    
+    const formData = new FormData();
+    formData.append('archive_all', archiveAll);
+    formData.append('tables', JSON.stringify(tables));
+    
+    try {
+        const response = await fetch('/api/service/archive', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            let message = result.message;
+            message += `<br>Успешно заархивировано: ${result.tables_archived} из ${result.total_tables || tables.length} таблиц`;
+            message += `<br>Папка архива: ${result.archive_dir}`;
+            
+            if (result.details && result.details.length > 0) {
+                message += `<br><br>Детали:`;
+                result.details.forEach(detail => {
+                    if (typeof detail === 'object' && detail.table) {
+                        message += `<br>• ${detail.table}: ${detail.rows_archived} записей`;
+                    } else if (typeof detail === 'string') {
+                        message += `<br>• ${detail}`;
+                    }
+                });
+            }
+            
+            resultDiv.innerHTML = `<div class="alert alert-success">${message}</div>`;
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${result.error || 'Неизвестная ошибка'}</div>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка сети: ${error.message}</div>`;
+    }
+}
+
+async function exportSelectedTables() {
+    const select = document.getElementById('exportTables');
+    const format = document.getElementById('exportFormat').value;
+    const tables = [];
+    
+    for (let option of select.options) {
+        if (option.selected) {
+            tables.push(option.value);
+        }
+    }
+    
+    if (tables.length === 0) {
+        alert('Выберите таблицы для экспорта');
+        return;
+    }
+    
+    const formData = new FormData();
+    tables.forEach(table => {
+        formData.append('tables', table);
+    });
+    formData.append('format', format);
+    
+    const response = await fetch('/api/export/tables', {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `export_${new Date().toISOString().slice(0,10)}`;
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (filenameMatch) {
+                filename = filenameMatch[1];
+            }
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    } else {
+        const result = await response.json();
+        alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+    }
+}
+
+function exportAllTables() {
+    const format = document.getElementById('exportFormat').value;
+    
+    if (!confirm(`Экспортировать все таблицы в формате ${format.toUpperCase()}?`)) {
+        return;
+    }
+    
+    window.open(`/api/export/all/${format}`, '_blank');
+}
+
+async function deleteTable() {
+    const table = document.getElementById('deleteTable').value;
+    
+    if (!table) {
+        alert('Выберите таблицу для удаления');
+        return;
+    }
+    
+    if (!confirm(`Удалить таблицу "${table}" и все ее данные?\n\nЭто действие нельзя отменить!`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('table', table);
+    
+    const response = await fetch('/api/table/delete', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+        alert(result.message);
+        location.reload();
+    } else {
+        alert('Ошибка: ' + result.error);
+    }
+}
+</script>
+{% endblock %}
