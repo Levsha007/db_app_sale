@@ -56,20 +56,26 @@ async def home(request: Request):
     try:
         tables = db.get_tables() or []
         table_counts = {}
+        total_records = 0
+        
         for table in tables:
-            table_counts[table] = db.get_table_count(table)
+            count = db.get_table_count(table)
+            table_counts[table] = count
+            total_records += count
         
         return templates.TemplateResponse("index.html", {
             "request": request,
             "tables": tables,
-            "table_counts": table_counts
+            "table_counts": table_counts,
+            "total_records": total_records
         })
     except Exception as e:
         print(f"Error in home route: {e}")
         return templates.TemplateResponse("index.html", {
             "request": request,
             "tables": [],
-            "table_counts": {}
+            "table_counts": {},
+            "total_records": 0
         })
 
 # ==================== ФОРМЫ ДЛЯ ОПЕРАЦИЙ С ДАННЫМИ ====================
@@ -86,7 +92,7 @@ async def data_forms(request: Request, table: str = "", page: int = 1):
         if table and table in tables:
             columns = db.get_table_columns(table) or []
             total_count = db.get_table_count(table)
-            total_pages = (total_count + per_page - 1) // per_page
+            total_pages = max(1, (total_count + per_page - 1) // per_page)
             
             if page < 1:
                 page = 1

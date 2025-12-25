@@ -7,7 +7,7 @@
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Панель управления базой данных</h1>
-    <p class="page-description">Управляйте таблицами, выполняйте запросы и создавайте резервные копии</p>
+    <p class="page-description">Мониторинг, управление и обслуживание вашей базы данных</p>
 </div>
 
 <div class="stats-grid">
@@ -16,9 +16,9 @@
             <i class="fas fa-table"></i>
         </div>
         <div class="stat-value">{{ tables|length }}</div>
-        <div class="stat-label">Таблиц в базе данных</div>
+        <div class="stat-label">Таблиц в базе</div>
         <a href="/data" class="btn btn-primary mt-4 w-100">
-            <i class="fas fa-list"></i> Просмотреть все
+            <i class="fas fa-list"></i> Просмотр таблиц
         </a>
     </div>
     
@@ -26,10 +26,10 @@
         <div class="stat-icon green">
             <i class="fas fa-database"></i>
         </div>
-        <div class="stat-value">{{ tables|length * 150 }}</div>
+        <div class="stat-value">{{ total_records }}</div>
         <div class="stat-label">Всего записей</div>
         <a href="/query" class="btn btn-success mt-4 w-100">
-            <i class="fas fa-search"></i> Конструктор запросов
+            <i class="fas fa-search"></i> Запросы
         </a>
     </div>
     
@@ -38,46 +38,94 @@
             <i class="fas fa-shield-alt"></i>
         </div>
         <div class="stat-value">24/7</div>
-        <div class="stat-label">Доступность системы</div>
+        <div class="stat-label">Доступность</div>
         <a href="/service" class="btn btn-warning mt-4 w-100">
-            <i class="fas fa-cogs"></i> Сервисные функции
+            <i class="fas fa-cogs"></i> Инструменты
         </a>
     </div>
 </div>
 
 <div class="card mt-4">
     <div class="card-header">
-        <h3><i class="fas fa-th"></i> Доступные таблицы</h3>
+        <h3><i class="fas fa-th"></i> Доступные таблицы базы данных</h3>
     </div>
     <div class="card-body">
-        <div class="grid grid-4">
-            {% for table in tables %}
-            <div class="card" style="border: 1px solid var(--border-color); background: var(--bg-primary);">
-                <div class="card-body" style="padding: 20px;">
-                    <h4 style="font-size: 16px; margin-bottom: 8px; color: var(--text-primary);">
-                        <i class="fas fa-table text-secondary"></i> {{ table }}
-                    </h4>
-                    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">
-                        Записей: {{ table_counts.get(table, 0) }}
-                    </p>
-                    <div class="d-flex gap-3">
-                        <a href="/data?table={{ table }}" class="btn btn-sm btn-primary" style="flex: 1;">
-                            <i class="fas fa-eye"></i> Данные
-                        </a>
-                        <a href="/query?table={{ table }}" class="btn btn-sm btn-secondary" style="flex: 1;">
-                            <i class="fas fa-code"></i> Запрос
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+        {% if tables %}
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Таблица</th>
+                        <th>Записей</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for table in tables %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-center gap-2">
+                                <i class="fas fa-table text-secondary"></i>
+                                <strong>{{ table }}</strong>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge" style="background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 20px;">
+                                {{ table_counts.get(table, 0) }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <a href="/data?table={{ table }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i> Данные
+                                </a>
+                                <a href="/query?table={{ table }}" class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-code"></i> SQL
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        
-        {% if not tables %}
-        <div class="alert alert-info text-center">
-            <i class="fas fa-info-circle"></i> В базе данных нет таблиц
+        {% else %}
+        <div class="empty-state">
+            <div style="font-size: 64px; color: var(--text-light); margin-bottom: 20px;">
+                <i class="fas fa-database"></i>
+            </div>
+            <h3 style="margin-bottom: 12px; color: var(--text-primary);">База данных пуста</h3>
+            <p style="color: var(--text-secondary); max-width: 400px; margin: 0 auto;">
+                В базе данных нет таблиц. Создайте таблицы через SQL конструктор или импортируйте данные.
+            </p>
+            <div class="mt-4">
+                <a href="/query" class="btn btn-primary">
+                    <i class="fas fa-code"></i> Перейти к конструктору
+                </a>
+            </div>
         </div>
         {% endif %}
     </div>
 </div>
+
+<style>
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.table-container {
+    overflow-x: auto;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+</style>
 {% endblock %}

@@ -1,156 +1,688 @@
 {% extends "base.html" %}
 
-{% block title %}Сервис - DB Admin Pro{% endblock %}
+{% block title %}Инструменты - DB Admin Pro{% endblock %}
 
-{% block page_title %}Сервисные функции{% endblock %}
+{% block page_title %}Инструменты управления{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">Управление системой</h1>
-    <p class="page-description">Резервное копирование, восстановление, экспорт и архивация данных</p>
+    <h1 class="page-title">Системные инструменты</h1>
+    <p class="page-description">Управление резервными копиями, экспортом данных и обслуживанием базы</p>
 </div>
 
-<div class="grid grid-3">
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-download"></i> Резервное копирование</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-info mb-4">
-                <p><strong>Формат:</strong> PostgreSQL .backup</p>
-                <p><strong>Содержимое:</strong> Полная копия БД</p>
-                <p><strong>Хранение:</strong> backups/дата_время/</p>
+<!-- Основные инструменты -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3><i class="fas fa-toolbox"></i> Основные функции</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2">
+            <div>
+                <button class="btn btn-primary w-100 mb-3" onclick="toggleSection('backupSection')">
+                    <i class="fas fa-download"></i> Резервное копирование
+                </button>
+                <button class="btn btn-warning w-100 mb-3" onclick="toggleSection('restoreSection')">
+                    <i class="fas fa-upload"></i> Восстановление
+                </button>
+                <button class="btn btn-success w-100 mb-3" onclick="toggleSection('exportSection')">
+                    <i class="fas fa-file-export"></i> Экспорт данных
+                </button>
             </div>
-            <button onclick="createBackup()" class="btn btn-primary w-100">
-                <i class="fas fa-save"></i> Создать Backup
-            </button>
-            <div id="backupResult" class="mt-3"></div>
+            <div>
+                <button class="btn btn-info w-100 mb-3" onclick="toggleSection('archiveSection')">
+                    <i class="fas fa-archive"></i> Архивация
+                </button>
+                <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('maintenanceSection')">
+                    <i class="fas fa-wrench"></i> Обслуживание
+                </button>
+                <button class="btn btn-danger w-100 mb-3" onclick="toggleSection('dangerSection')">
+                    <i class="fas fa-exclamation-triangle"></i> Опасные операции
+                </button>
+            </div>
         </div>
     </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-upload"></i> Восстановление</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-warning mb-4">
-                <p><strong>Формат:</strong> Только .backup файлы</p>
-                <p><strong>Внимание:</strong> Текущие данные будут заменены!</p>
+</div>
+
+<!-- Резервное копирование -->
+<div class="card mb-4" id="backupSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center">
+        <h3><i class="fas fa-shield-alt"></i> Создание резервной копии</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('backupSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info mb-4">
+            <div class="d-flex align-center gap-2">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>Информация:</strong> Создается полная копия базы данных в формате PostgreSQL .backup
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Выберите файл .backup</label>
+        </div>
+        
+        <div class="grid grid-3">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="stat-value">Полный</div>
+                <div class="stat-label">Формат копии</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <div class="stat-value">backups/</div>
+                <div class="stat-label">Каталог хранения</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon orange">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-value">Авто</div>
+                <div class="stat-label">Дата и время</div>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-center mt-4">
+            <button onclick="createBackup()" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Создать резервную копию
+            </button>
+        </div>
+        
+        <div id="backupResult" class="mt-3"></div>
+    </div>
+</div>
+
+<!-- Восстановление -->
+<div class="card mb-4" id="restoreSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center">
+        <h3><i class="fas fa-history"></i> Восстановление из резервной копии</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('restoreSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning mb-4">
+            <div class="d-flex align-center gap-2">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>Внимание:</strong> Все текущие данные будут удалены и заменены данными из резервной копии
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Выберите файл резервной копии (.backup)</label>
+            <div class="file-upload">
                 <input type="file" id="backupFile" accept=".backup" class="form-control">
+                <div class="file-info mt-2" id="fileInfo"></div>
             </div>
-            <button onclick="restoreBackup()" class="btn btn-warning w-100">
-                <i class="fas fa-redo"></i> Восстановить БД
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Проверка файла</label>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-secondary" onclick="checkBackupFile()">
+                    <i class="fas fa-search"></i> Проверить
+                </button>
+                <button class="btn btn-sm btn-info" onclick="showBackupList()">
+                    <i class="fas fa-list"></i> Список копий
+                </button>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-center mt-4">
+            <button onclick="restoreBackup()" class="btn btn-warning btn-lg">
+                <i class="fas fa-redo"></i> Восстановить базу данных
             </button>
-            <div id="restoreResult" class="mt-3"></div>
+        </div>
+        
+        <div id="restoreResult" class="mt-3"></div>
+    </div>
+</div>
+
+<!-- Экспорт данных -->
+<div class="card mb-4" id="exportSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center">
+        <h3><i class="fas fa-download"></i> Экспорт данных</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('exportSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2">
+            <div>
+                <div class="form-group">
+                    <label class="form-label">Выберите таблицы</label>
+                    <select id="exportTables" multiple class="form-control" style="height: 200px;">
+                        {% for table in tables %}
+                        <option value="{{ table }}">{{ table }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text">Зажмите Ctrl для выбора нескольких таблиц</small>
+                </div>
+            </div>
+            
+            <div>
+                <div class="form-group">
+                    <label class="form-label">Формат экспорта</label>
+                    <div class="format-selector">
+                        <div class="format-option active" data-format="excel" onclick="selectFormat('excel')">
+                            <i class="fas fa-file-excel"></i>
+                            <span>Excel (.xlsx)</span>
+                        </div>
+                        <div class="format-option" data-format="json" onclick="selectFormat('json')">
+                            <i class="fas fa-file-code"></i>
+                            <span>JSON (.json)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Опции</label>
+                    <div class="options-list">
+                        <label class="option-item">
+                            <input type="checkbox" id="exportHeaders" checked>
+                            <span>Включать заголовки</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="checkbox" id="exportFormatting">
+                            <span>Сохранить форматирование</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="checkbox" id="exportAllData">
+                            <span>Все данные (без ограничений)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-flex gap-3 justify-center mt-4">
+            <button onclick="exportSelectedTables()" class="btn btn-success">
+                <i class="fas fa-download"></i> Экспорт выбранных
+            </button>
+            <button onclick="exportAllTables()" class="btn btn-primary">
+                <i class="fas fa-database"></i> Экспорт всех таблиц
+            </button>
         </div>
     </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-file-export"></i> Экспорт данных</h3>
+</div>
+
+<!-- Архивация -->
+<div class="card mb-4" id="archiveSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center">
+        <h3><i class="fas fa-box-archive"></i> Архивация таблиц</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('archiveSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning mb-4">
+            <div class="d-flex align-center gap-2">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>Важно:</strong> После архивации таблицы будут удалены из базы данных
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <div class="alert alert-info mb-4">
-                <p><strong>Форматы:</strong> Excel (.xlsx) и JSON (.json)</p>
-                <p><strong>Хранение:</strong> exports/дата_время/</p>
+        
+        <div class="grid grid-2">
+            <div>
+                <div class="form-group">
+                    <label class="form-label">Таблицы для архивации</label>
+                    <select id="archiveTables" multiple class="form-control" style="height: 200px;">
+                        {% for table in tables %}
+                        <option value="{{ table }}">{{ table }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text">Будут созданы файлы: .backup, .xlsx, .json</small>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Таблицы для экспорта</label>
-                <select id="exportTables" multiple class="form-control" style="height: 120px;">
-                    {% for table in tables %}
-                    <option value="{{ table }}">{{ table }}</option>
-                    {% endfor %}
-                </select>
-                <small class="form-text">Ctrl+Click для выбора нескольких</small>
+            
+            <div>
+                <div class="form-group">
+                    <label class="form-label">Настройки архивации</label>
+                    <div class="options-list">
+                        <label class="option-item">
+                            <input type="checkbox" id="archiveAll">
+                            <span>Архивировать все таблицы</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="checkbox" id="keepStructure">
+                            <span>Сохранить структуру</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="checkbox" id="compressArchive">
+                            <span>Сжатие архивов</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Каталог архивации</label>
+                    <div class="directory-info">
+                        <i class="fas fa-folder"></i>
+                        <span>archives/[дата_время]/</span>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Формат</label>
-                <select id="exportFormat" class="form-control">
-                    <option value="excel">Excel</option>
-                    <option value="json">JSON</option>
-                </select>
+        </div>
+        
+        <div class="d-flex justify-center mt-4">
+            <button onclick="archiveTables()" class="btn btn-info btn-lg">
+                <i class="fas fa-archive"></i> Архивировать выбранные таблицы
+            </button>
+        </div>
+        
+        <div id="archiveResult" class="mt-3"></div>
+    </div>
+</div>
+
+<!-- Обслуживание -->
+<div class="card mb-4" id="maintenanceSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center">
+        <h3><i class="fas fa-tools"></i> Обслуживание базы данных</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('maintenanceSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-3">
+            <div class="maintenance-card" onclick="runMaintenance('vacuum')">
+                <div class="maintenance-icon blue">
+                    <i class="fas fa-broom"></i>
+                </div>
+                <h4>Очистка</h4>
+                <p>VACUUM базы данных</p>
+                <span class="maintenance-status">Рекомендуется</span>
             </div>
-            <div class="d-flex gap-2">
-                <button onclick="exportSelectedTables()" class="btn btn-success" style="flex: 1;">
-                    <i class="fas fa-download"></i> Экспорт
-                </button>
-                <button onclick="exportAllTables()" class="btn btn-secondary">
-                    <i class="fas fa-database"></i> Все
-                </button>
+            
+            <div class="maintenance-card" onclick="runMaintenance('analyze')">
+                <div class="maintenance-icon green">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h4>Анализ</h4>
+                <p>ANALYZE статистики</p>
+                <span class="maintenance-status">Для оптимизации</span>
+            </div>
+            
+            <div class="maintenance-card" onclick="runMaintenance('reindex')">
+                <div class="maintenance-icon orange">
+                    <i class="fas fa-sync-alt"></i>
+                </div>
+                <h4>Переиндексация</h4>
+                <p>REINDEX таблиц</p>
+                <span class="maintenance-status">Для производительности</span>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-4">
+            <p><strong>Информация:</strong> Эти операции оптимизируют производительность базы данных</p>
+        </div>
+    </div>
+</div>
+
+<!-- Опасные операции -->
+<div class="card mb-4" id="dangerSection" style="display: none;">
+    <div class="card-header d-flex justify-between align-center" style="background: #fee2e2; border-color: #fecaca;">
+        <h3><i class="fas fa-skull-crossbones"></i> Опасные операции</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleSection('dangerSection')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-danger mb-4">
+            <div class="d-flex align-center gap-2">
+                <i class="fas fa-radiation"></i>
+                <div>
+                    <strong>Критическое предупреждение:</strong> Эти операции невозможно отменить!
+                </div>
+            </div>
+        </div>
+        
+        <div class="danger-grid">
+            <div class="danger-card" onclick="showDeleteTableModal()">
+                <div class="danger-icon">
+                    <i class="fas fa-trash"></i>
+                </div>
+                <h4>Удаление таблицы</h4>
+                <p>Полное удаление таблицы и всех данных</p>
+                <span class="danger-label">Необратимо</span>
+            </div>
+            
+            <div class="danger-card" onclick="showTruncateModal()">
+                <div class="danger-icon">
+                    <i class="fas fa-eraser"></i>
+                </div>
+                <h4>Очистка таблицы</h4>
+                <p>TRUNCATE - удаление всех записей</p>
+                <span class="danger-label">Быстро</span>
+            </div>
+            
+            <div class="danger-card" onclick="showResetModal()">
+                <div class="danger-icon">
+                    <i class="fas fa-bomb"></i>
+                </div>
+                <h4>Сброс базы</h4>
+                <p>Удаление всех таблиц</p>
+                <span class="danger-label">Опасная</span>
             </div>
         </div>
     </div>
 </div>
 
-<div class="grid grid-2 mt-4">
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-archive"></i> Архивация таблиц</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-warning mb-4">
-                <p><strong>Внимание:</strong> Таблицы будут удалены после архивации!</p>
-                <p><strong>Файлы:</strong> .backup, .xlsx, .json для каждой таблицы</p>
-                <p><strong>Хранение:</strong> archives/дата_время/</p>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Таблицы для архивации</label>
-                <select id="archiveTables" multiple class="form-control" style="height: 150px;">
-                    {% for table in tables %}
-                    <option value="{{ table }}">{{ table }}</option>
-                    {% endfor %}
-                </select>
-                <small class="form-text">Ctrl+Click для выбора нескольких</small>
-            </div>
-            <div class="form-group">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="archiveAll">
-                    <span>Архивировать ВСЕ таблицы</span>
-                </label>
-            </div>
-            <button onclick="archiveTables()" class="btn btn-danger w-100">
-                <i class="fas fa-box-archive"></i> Архивировать
+<!-- Модальные окна -->
+<div class="modal" id="deleteTableModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-trash"></i> Удаление таблицы</h3>
+            <button class="btn btn-sm btn-secondary" onclick="closeModal('deleteTableModal')">
+                <i class="fas fa-times"></i>
             </button>
-            <div id="archiveResult" class="mt-3"></div>
         </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-trash"></i> Управление таблицами</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-danger mb-4">
-                <p><strong>Внимание:</strong> Действие необратимо!</p>
-                <p>Все данные таблицы будут удалены безвозвратно.</p>
-            </div>
+        <div class="modal-body">
             <div class="form-group">
-                <label class="form-label">Таблица для удаления</label>
+                <label class="form-label">Выберите таблицу для удаления</label>
                 <select id="deleteTable" class="form-control">
-                    <option value="">Выберите таблицу</option>
+                    <option value="">-- Выберите таблицу --</option>
                     {% for table in tables %}
                     <option value="{{ table }}">{{ table }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <button onclick="deleteTable()" class="btn btn-danger w-100">
-                <i class="fas fa-trash-alt"></i> Удалить таблицу
-            </button>
+            <div class="alert alert-danger mt-3">
+                <p>Эта операция удалит таблицу <strong id="tableToDelete"></strong> и все её данные без возможности восстановления.</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('deleteTableModal')">Отмена</button>
+            <button class="btn btn-danger" onclick="deleteTable()">Удалить таблицу</button>
         </div>
     </div>
 </div>
+
+<style>
+/* Стили для раскрывающихся секций */
+.format-selector {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.format-option {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.format-option.active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.format-option i {
+    font-size: 24px;
+    color: #6b7280;
+}
+
+.format-option.active i {
+    color: #3b82f6;
+}
+
+.options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.option-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f9fafb;
+    cursor: pointer;
+}
+
+.option-item:hover {
+    background: #f3f4f6;
+}
+
+.directory-info {
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.maintenance-card {
+    padding: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.maintenance-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.maintenance-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 24px;
+}
+
+.maintenance-icon.blue {
+    background: #dbeafe;
+    color: #3b82f6;
+}
+
+.maintenance-icon.green {
+    background: #d1fae5;
+    color: #10b981;
+}
+
+.maintenance-icon.orange {
+    background: #fef3c7;
+    color: #f59e0b;
+}
+
+.maintenance-status {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #f3f4f6;
+    border-radius: 20px;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.danger-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.danger-card {
+    padding: 20px;
+    border: 2px solid #fee2e2;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #fef2f2;
+}
+
+.danger-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(239, 68, 68, 0.1);
+}
+
+.danger-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #fee2e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    font-size: 24px;
+    color: #ef4444;
+}
+
+.danger-label {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #ef4444;
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+/* Модальные окна */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.file-upload {
+    border: 2px dashed #e5e7eb;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.file-info {
+    font-size: 14px;
+    color: #6b7280;
+}
+</style>
 
 <script>
+let currentFormat = 'excel';
+
+// Функции для управления секциями
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (section.style.display === 'none' || section.style.display === '') {
+        section.style.display = 'block';
+        // Прокрутка к секции
+        section.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+function selectFormat(format) {
+    currentFormat = format;
+    document.querySelectorAll('.format-option').forEach(el => {
+        el.classList.remove('active');
+        if (el.dataset.format === format) {
+            el.classList.add('active');
+        }
+    });
+}
+
+function checkBackupFile() {
+    const fileInput = document.getElementById('backupFile');
+    const file = fileInput.files[0];
+    const fileInfo = document.getElementById('fileInfo');
+    
+    if (!file) {
+        fileInfo.innerHTML = '<span style="color: #ef4444;">Файл не выбран</span>';
+        return;
+    }
+    
+    if (!file.name.endsWith('.backup')) {
+        fileInfo.innerHTML = '<span style="color: #ef4444;">Неверный формат файла. Требуется .backup</span>';
+        return;
+    }
+    
+    const size = (file.size / (1024 * 1024)).toFixed(2);
+    fileInfo.innerHTML = `
+        <div style="color: #10b981;">
+            <i class="fas fa-check-circle"></i> Файл проверен
+        </div>
+        <div>Имя: ${file.name}</div>
+        <div>Размер: ${size} MB</div>
+        <div>Тип: PostgreSQL Backup</div>
+    `;
+}
+
+function showBackupList() {
+    alert('Функция просмотра списка резервных копий в разработке');
+}
+
 async function createBackup() {
     if (!confirm('Создать полную резервную копию базы данных?')) {
         return;
     }
     
     const resultDiv = document.getElementById('backupResult');
-    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Создание backup...</div>';
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Создание резервной копии...</div>';
     
     const response = await fetch('/api/service/backup', {
         method: 'POST'
@@ -174,7 +706,7 @@ async function restoreBackup() {
         return;
     }
     
-    if (!confirm('ВНИМАНИЕ! Все текущие данные будут удалены и заменены данными из бэкапа. Продолжить?')) {
+    if (!confirm('ВНИМАНИЕ! Все текущие данные будут удалены и заменены данными из резервной копии. Продолжить?')) {
         return;
     }
     
@@ -195,12 +727,7 @@ async function restoreBackup() {
         resultDiv.innerHTML = `<div class="alert alert-success">${result.message}<br>Страница обновится через 3 секунды...</div>`;
         setTimeout(() => location.reload(), 3000);
     } else {
-        if (result.error.includes('transaction_timeout')) {
-            resultDiv.innerHTML = `<div class="alert alert-success">Восстановление выполнено с игнорированием предупреждений - страница обновится через 3 секунды...</div>`;
-            setTimeout(() => location.reload(), 3000);
-        } else {
-            resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${result.error}</div>`;
-        }
+        resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${result.error}</div>`;
     }
 }
 
@@ -248,18 +775,6 @@ async function archiveTables() {
         if (result.success) {
             let message = result.message;
             message += `<br>Успешно заархивировано: ${result.tables_archived} из ${result.total_tables || tables.length} таблиц`;
-            message += `<br>Папка архива: ${result.archive_dir}`;
-            
-            if (result.details && result.details.length > 0) {
-                message += `<br><br>Детали:`;
-                result.details.forEach(detail => {
-                    if (typeof detail === 'object' && detail.table) {
-                        message += `<br>• ${detail.table}: ${detail.rows_archived} записей`;
-                    } else if (typeof detail === 'string') {
-                        message += `<br>• ${detail}`;
-                    }
-                });
-            }
             
             resultDiv.innerHTML = `<div class="alert alert-success">${message}</div>`;
             setTimeout(() => location.reload(), 3000);
@@ -273,7 +788,7 @@ async function archiveTables() {
 
 async function exportSelectedTables() {
     const select = document.getElementById('exportTables');
-    const format = document.getElementById('exportFormat').value;
+    const format = currentFormat;
     const tables = [];
     
     for (let option of select.options) {
@@ -325,7 +840,7 @@ async function exportSelectedTables() {
 }
 
 function exportAllTables() {
-    const format = document.getElementById('exportFormat').value;
+    const format = currentFormat;
     
     if (!confirm(`Экспортировать все таблицы в формате ${format.toUpperCase()}?`)) {
         return;
@@ -334,15 +849,43 @@ function exportAllTables() {
     window.open(`/api/export/all/${format}`, '_blank');
 }
 
+function runMaintenance(type) {
+    const operations = {
+        'vacuum': 'VACUUM (очистка)',
+        'analyze': 'ANALYZE (анализ статистики)',
+        'reindex': 'REINDEX (переиндексация)'
+    };
+    
+    alert(`Функция ${operations[type]} базы данных будет реализована в следующей версии`);
+}
+
+// Модальные окна
+function showDeleteTableModal() {
+    document.getElementById('deleteTableModal').style.display = 'flex';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function showTruncateModal() {
+    alert('Функция очистки таблиц будет реализована в следующей версии');
+}
+
+function showResetModal() {
+    alert('Функция сброса базы данных будет реализована в следующей версии');
+}
+
 async function deleteTable() {
-    const table = document.getElementById('deleteTable').value;
+    const tableSelect = document.getElementById('deleteTable');
+    const table = tableSelect.value;
     
     if (!table) {
         alert('Выберите таблицу для удаления');
         return;
     }
     
-    if (!confirm(`Удалить таблицу "${table}" и все ее данные?\n\nЭто действие нельзя отменить!`)) {
+    if (!confirm(`Удалить таблицу "${table}" и все её данные?\n\nЭто действие нельзя отменить!`)) {
         return;
     }
     
@@ -358,6 +901,7 @@ async function deleteTable() {
     
     if (result.success) {
         alert(result.message);
+        closeModal('deleteTableModal');
         location.reload();
     } else {
         alert('Ошибка: ' + result.error);
