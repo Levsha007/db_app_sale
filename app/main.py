@@ -225,6 +225,25 @@ async def delete_table(table: str = Form(...)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# ==================== ОЧИСТКА ВСЕЙ БАЗЫ ДАННЫХ ====================
+@app.post("/api/service/reset-all")
+async def reset_all_tables():
+    """Удалить ВСЕ таблицы из базы данных"""
+    try:
+        success, message = db.reset_all_tables()
+        
+        if success:
+            return {
+                "success": True,
+                "message": message,
+                "tables_removed": message.split(':')[-1].strip() if ':' in message else 'unknown'
+            }
+        else:
+            return {"success": False, "error": message}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # ==================== ЭКСПОРТ ОТДЕЛЬНОЙ ТАБЛИЦЫ ====================
 @app.get("/api/export/table/{table_name}/{format}")
 async def export_table(table_name: str, format: str):

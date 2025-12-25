@@ -18,18 +18,18 @@
     <div class="card-body">
         <div class="grid grid-2">
             <div>
-                <button class="btn btn-primary w-100 mb-3" onclick="toggleSection('backupSection')">
+                <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('backupSection')">
                     <i class="fas fa-download"></i> Резервное копирование
                 </button>
-                <button class="btn btn-warning w-100 mb-3" onclick="toggleSection('restoreSection')">
+                <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('restoreSection')">
                     <i class="fas fa-upload"></i> Восстановление
                 </button>
-                <button class="btn btn-success w-100 mb-3" onclick="toggleSection('exportSection')">
+                <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('exportSection')">
                     <i class="fas fa-file-export"></i> Экспорт данных
                 </button>
             </div>
             <div>
-                <button class="btn btn-info w-100 mb-3" onclick="toggleSection('archiveSection')">
+                <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('archiveSection')">
                     <i class="fas fa-archive"></i> Архивация
                 </button>
                 <button class="btn btn-secondary w-100 mb-3" onclick="toggleSection('maintenanceSection')">
@@ -63,7 +63,7 @@
         
         <div class="grid grid-3">
             <div class="stat-card">
-                <div class="stat-icon blue">
+                <div class="stat-icon">
                     <i class="fas fa-database"></i>
                 </div>
                 <div class="stat-value">Полный</div>
@@ -71,7 +71,7 @@
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon green">
+                <div class="stat-icon">
                     <i class="fas fa-folder"></i>
                 </div>
                 <div class="stat-value">backups/</div>
@@ -79,7 +79,7 @@
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon orange">
+                <div class="stat-icon">
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="stat-value">Авто</div>
@@ -129,7 +129,7 @@
                 <button class="btn btn-sm btn-secondary" onclick="checkBackupFile()">
                     <i class="fas fa-search"></i> Проверить
                 </button>
-                <button class="btn btn-sm btn-info" onclick="showBackupList()">
+                <button class="btn btn-sm btn-secondary" onclick="showBackupList()">
                     <i class="fas fa-list"></i> Список копий
                 </button>
             </div>
@@ -190,10 +190,6 @@
                             <span>Включать заголовки</span>
                         </label>
                         <label class="option-item">
-                            <input type="checkbox" id="exportFormatting">
-                            <span>Сохранить форматирование</span>
-                        </label>
-                        <label class="option-item">
                             <input type="checkbox" id="exportAllData">
                             <span>Все данные (без ограничений)</span>
                         </label>
@@ -252,14 +248,6 @@
                             <input type="checkbox" id="archiveAll">
                             <span>Архивировать все таблицы</span>
                         </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="keepStructure">
-                            <span>Сохранить структуру</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="compressArchive">
-                            <span>Сжатие архивов</span>
-                        </label>
                     </div>
                 </div>
                 
@@ -274,7 +262,7 @@
         </div>
         
         <div class="d-flex justify-center mt-4">
-            <button onclick="archiveTables()" class="btn btn-info btn-lg">
+            <button onclick="archiveTables()" class="btn btn-warning btn-lg">
                 <i class="fas fa-archive"></i> Архивировать выбранные таблицы
             </button>
         </div>
@@ -294,7 +282,7 @@
     <div class="card-body">
         <div class="grid grid-3">
             <div class="maintenance-card" onclick="runMaintenance('vacuum')">
-                <div class="maintenance-icon blue">
+                <div class="maintenance-icon">
                     <i class="fas fa-broom"></i>
                 </div>
                 <h4>Очистка</h4>
@@ -303,7 +291,7 @@
             </div>
             
             <div class="maintenance-card" onclick="runMaintenance('analyze')">
-                <div class="maintenance-icon green">
+                <div class="maintenance-icon">
                     <i class="fas fa-chart-bar"></i>
                 </div>
                 <h4>Анализ</h4>
@@ -312,7 +300,7 @@
             </div>
             
             <div class="maintenance-card" onclick="runMaintenance('reindex')">
-                <div class="maintenance-icon orange">
+                <div class="maintenance-icon">
                     <i class="fas fa-sync-alt"></i>
                 </div>
                 <h4>Переиндексация</h4>
@@ -329,7 +317,7 @@
 
 <!-- Опасные операции -->
 <div class="card mb-4" id="dangerSection" style="display: none;">
-    <div class="card-header d-flex justify-between align-center" style="background: #fee2e2; border-color: #fecaca;">
+    <div class="card-header d-flex justify-between align-center">
         <h3><i class="fas fa-skull-crossbones"></i> Опасные операции</h3>
         <button class="btn btn-sm btn-secondary" onclick="toggleSection('dangerSection')">
             <i class="fas fa-times"></i>
@@ -372,6 +360,15 @@
                 <p>Удаление всех таблиц</p>
                 <span class="danger-label">Опасная</span>
             </div>
+            
+            <div class="danger-card" onclick="showResetAllModal()">
+                <div class="danger-icon">
+                    <i class="fas fa-fire"></i>
+                </div>
+                <h4>Очистка всей БД</h4>
+                <p>Удалить ВСЕ таблицы</p>
+                <span class="danger-label">Критическая</span>
+            </div>
         </div>
     </div>
 </div>
@@ -406,191 +403,164 @@
     </div>
 </div>
 
+<!-- Модальное окно для очистки всей БД -->
+<div class="modal" id="resetAllModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-fire"></i> Очистка всей базы данных</h3>
+            <button class="btn btn-sm btn-secondary" onclick="closeModal('resetAllModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-danger">
+                <div class="d-flex align-center gap-2 mb-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ</strong>
+                </div>
+                <p>Вы собираетесь удалить <strong>ВСЕ ТАБЛИЦЫ</strong> из базы данных.</p>
+                <ul class="mt-3" style="padding-left: 20px;">
+                    <li>Все данные будут удалены безвозвратно</li>
+                    <li>Будет очищена вся структура базы</li>
+                    <li>Операция не может быть отменена</li>
+                    <li>Рекомендуется сделать резервную копию перед выполнением</li>
+                </ul>
+            </div>
+            
+            <div class="form-group mt-4">
+                <label class="form-label">Для подтверждения введите "УДАЛИТЬ ВСЁ"</label>
+                <input type="text" id="resetConfirmation" class="form-control" placeholder="УДАЛИТЬ ВСЁ">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('resetAllModal')">Отмена</button>
+            <button class="btn btn-danger" id="resetAllBtn" disabled onclick="resetAllTables()">Очистить всю БД</button>
+        </div>
+    </div>
+</div>
+
 <style>
-/* Стили для раскрывающихся секций */
-.format-selector {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.format-option {
-    flex: 1;
-    padding: 15px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.format-option.active {
-    border-color: #3b82f6;
-    background: #eff6ff;
-}
-
-.format-option i {
-    font-size: 24px;
-    color: #6b7280;
-}
-
-.format-option.active i {
-    color: #3b82f6;
-}
-
-.options-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.option-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-radius: 6px;
-    background: #f9fafb;
-    cursor: pointer;
-}
-
-.option-item:hover {
-    background: #f3f4f6;
-}
-
 .directory-info {
     padding: 12px;
-    background: #f9fafb;
+    background: rgba(255, 255, 255, 0.02);
     border-radius: 6px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     gap: 10px;
+    color: var(--text-secondary);
 }
 
 .maintenance-card {
     padding: 20px;
-    border: 2px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: var(--transition);
+    background: var(--bg-secondary);
 }
 
 .maintenance-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    border-color: var(--accent-primary);
 }
 
 .maintenance-icon {
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 15px;
-    font-size: 24px;
-}
-
-.maintenance-icon.blue {
-    background: #dbeafe;
-    color: #3b82f6;
-}
-
-.maintenance-icon.green {
-    background: #d1fae5;
-    color: #10b981;
-}
-
-.maintenance-icon.orange {
-    background: #fef3c7;
-    color: #f59e0b;
+    font-size: 20px;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-primary);
+    border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .maintenance-status {
     display: inline-block;
     padding: 4px 12px;
-    background: #f3f4f6;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     font-size: 12px;
     margin-top: 10px;
+    color: var(--text-secondary);
 }
 
 .danger-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+    gap: 16px;
 }
 
 .danger-card {
     padding: 20px;
-    border: 2px solid #fee2e2;
+    border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: 10px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s;
-    background: #fef2f2;
+    transition: var(--transition);
+    background: rgba(239, 68, 68, 0.05);
 }
 
 .danger-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(239, 68, 68, 0.1);
+    transform: translateY(-2px);
+    border-color: var(--accent-danger);
+    background: rgba(239, 68, 68, 0.1);
 }
 
 .danger-icon {
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: #fee2e2;
+    background: rgba(239, 68, 68, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 15px;
-    font-size: 24px;
-    color: #ef4444;
+    font-size: 20px;
+    color: var(--accent-danger);
 }
 
 .danger-label {
     display: inline-block;
     padding: 4px 12px;
-    background: #ef4444;
+    background: var(--accent-danger);
     color: white;
     border-radius: 20px;
     font-size: 12px;
     margin-top: 10px;
 }
 
-/* Модальные окна */
 .modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
 }
 
 .modal-content {
-    background: white;
+    background: var(--bg-secondary);
     border-radius: 12px;
     width: 90%;
     max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
     padding: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -602,22 +572,28 @@
 
 .modal-footer {
     padding: 20px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
     gap: 10px;
 }
 
 .file-upload {
-    border: 2px dashed #e5e7eb;
-    padding: 20px;
+    border: 2px dashed var(--border-color);
+    padding: 30px;
     border-radius: 8px;
     text-align: center;
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.file-upload:hover {
+    border-color: var(--accent-primary);
 }
 
 .file-info {
     font-size: 14px;
-    color: #6b7280;
+    color: var(--text-secondary);
+    margin-top: 10px;
 }
 </style>
 
@@ -629,7 +605,6 @@ function toggleSection(sectionId) {
     const section = document.getElementById(sectionId);
     if (section.style.display === 'none' || section.style.display === '') {
         section.style.display = 'block';
-        // Прокрутка к секции
         section.scrollIntoView({ behavior: 'smooth' });
     } else {
         section.style.display = 'none';
@@ -864,6 +839,22 @@ function showDeleteTableModal() {
     document.getElementById('deleteTableModal').style.display = 'flex';
 }
 
+function showResetAllModal() {
+    const modal = document.getElementById('resetAllModal');
+    modal.style.display = 'flex';
+    
+    // Сброс поля подтверждения
+    const confirmationInput = document.getElementById('resetConfirmation');
+    const resetBtn = document.getElementById('resetAllBtn');
+    confirmationInput.value = '';
+    resetBtn.disabled = true;
+    
+    // Валидация ввода
+    confirmationInput.addEventListener('input', function() {
+        resetBtn.disabled = this.value !== 'УДАЛИТЬ ВСЁ';
+    });
+}
+
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
 }
@@ -905,6 +896,36 @@ async function deleteTable() {
         location.reload();
     } else {
         alert('Ошибка: ' + result.error);
+    }
+}
+
+async function resetAllTables() {
+    const confirmationInput = document.getElementById('resetConfirmation');
+    if (confirmationInput.value !== 'УДАЛИТЬ ВСЁ') {
+        alert('Введите правильную фразу подтверждения');
+        return;
+    }
+    
+    if (!confirm('КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ:\n\nВы уверены, что хотите удалить ВСЕ таблицы из базы данных?\n\nЭто действие необратимо и удалит все данные!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/service/reset-all', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            closeModal('resetAllModal');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        alert('Ошибка сети: ' + error.message);
     }
 }
 </script>

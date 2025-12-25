@@ -321,7 +321,7 @@ class Database:
                 delete_ref_query = f'DELETE FROM "{ref_table_name}" WHERE "{ref_column}" IN (SELECT id FROM "{table_name}" WHERE {condition})'
                 cursor.execute(delete_ref_query)
             
-            # Теперь удаляем из основной таблицы
+            # Теперь удаляем из основной таблиции
             delete_query = f'DELETE FROM "{table_name}" WHERE {condition}'
             cursor.execute(delete_query)
             
@@ -417,6 +417,58 @@ class Database:
         except Exception as e:
             print(f"Исключение при удалении таблицы {table_name}: {e}")
             return False
+    
+    # ==================== НОВЫЙ МЕТОД: УДАЛЕНИЕ ВСЕХ ТАБЛИЦ ====================
+    def reset_all_tables(self):
+        """Удалить ВСЕ таблицы из базы данных"""
+        try:
+            conn = self.get_connection(dict_cursor=False)
+            if not conn:
+                return False, "Ошибка подключения к БД"
+            
+            cursor = conn.cursor()
+            
+            # Получаем все таблицы в публичной схеме
+            cursor.execute("""
+                SELECT tablename 
+                FROM pg_tables 
+                WHERE schemaname = 'public'
+                ORDER BY tablename
+            """)
+            tables = cursor.fetchall()
+            
+            if not tables:
+                conn.close()
+                return True, "В базе данных нет таблиц"
+            
+            table_names = [table[0] for table in tables]
+            tables_removed = 0
+            
+            # Удаляем все таблицы каскадно
+            for table_name in table_names:
+                try:
+                    # Отключаем внешние ключи для этой сессии
+                    cursor.execute('SET CONSTRAINTS ALL DEFERRED')
+                    
+                    # Удаляем таблицу с каскадом
+                    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
+                    tables_removed += 1
+                    print(f"Удалена таблица: {table_name}")
+                    
+                except Exception as e:
+                    print(f"Ошибка при удалении таблицы {table_name}: {e}")
+                    conn.rollback()
+                    conn.close()
+                    return False, f"Ошибка при удалении таблицы {table_name}: {str(e)}"
+            
+            conn.commit()
+            conn.close()
+            
+            return True, f"Успешно удалено {tables_removed} таблиц из {len(table_names)}"
+            
+        except Exception as e:
+            print(f"Исключение при удалении всех таблиц: {e}")
+            return False, f"Ошибка при удалении всех таблиц: {str(e)}"
     
     def export_table_to_excel(self, table_name):
         """Экспорт таблицы в Excel файл"""
