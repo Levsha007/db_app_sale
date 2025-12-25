@@ -3,619 +3,537 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Streamin
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import os
+import csv
 import json
 from datetime import datetime
+import io
 import tempfile
 from pathlib import Path
-import asyncio
 
-import data_manager as dm
-db_handler = dm.DatabaseManager()
+import database as db_module
+db = db_module.db
 
-app = FastAPI(
-    title="Database Management Interface",
-    description="Web-based database administration tool",
-    version="2.0.0",
-    docs_url=None,
-    redoc_url=None
-)
+app = FastAPI(title="DB Admin App", version="1.0.0")
 
-# CORS configuration
+# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Create required directories
-def setup_directories():
-    directories = ["static", "templates", "backups", "exports", "archives"]
-    for dir_name in directories:
-        Path(dir_name).mkdir(exist_ok=True)
-        print(f"Directory ensured: {dir_name}")
+# ==================== ТЕСТОВЫЙ ЭНДПОИНТ ====================
+@app.get("/test")
+async def test_endpoint():
+    return {"message": "App is running", "status": "OK", "timestamp": datetime.now().isoformat()}
 
-setup_directories()
+# ==================== СТАТИЧЕСКИЕ ФАЙЛЫ ====================
+# Создаем папки если их нет
+try:
+    static_dir = Path("static")
+    static_dir.mkdir(exist_ok=True)
+    templates_dir = Path("templates")
+    templates_dir.mkdir(exist_ok=True)
+except Exception as e:
+    print(f"Warning creating directories: {e}")
 
-# Setup static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Монтируем статические файлы
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception as e:
+    print(f"Warning mounting static: {e}")
+
+# Настраиваем шаблоны
 templates = Jinja2Templates(directory="templates")
 
-# =============== UTILITY FUNCTIONS ===============
-def get_current_timestamp() -> str:
-    """Get current timestamp in ISO format"""
-    return datetime.now().isoformat()
-
-def format_response(success: bool, data: Any = None, message: str = "", error: str = "") -> Dict:
-    """Standardized response format"""
-    return {
-        "status": "success" if success else "error",
-        "timestamp": get_current_timestamp(),
-        "data": data,
-        "message": message,
-        "error": error
-    }
-
-# =============== ROUTE HANDLERS ===============
+# ==================== ГЛАВНАЯ СТРАНИЦА ====================
 @app.get("/", response_class=HTMLResponse)
-async def dashboard_view(request: Request):
-    """Main dashboard view"""
-    try:
-        table_list = db_handler.get_table_names()
-        table_stats = {}
-        
-        for table in table_list:
-            table_stats[table] = db_handler.count_table_rows(table)
-        
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "tables": table_list,
-            "table_stats": table_stats,
-            "total_tables": len(table_list)
-        })
-    except Exception as e:
-        return templates.TemplateResponse("error.html", {
-            "request": request,
-            "error": f"Database connection error: {str(e)}"
-        })
-
-@app.get("/tables", response_class=HTMLResponse)
-async def tables_management(request: Request, table: str = "", page: int = 1):
-    """Table data management interface"""
-    table_list = db_handler.get_table_names() or []
-    columns_info = []
-    table_data = []
-    total_rows = 0
-    page_count = 0
-    rows_per_page = 100
+async def home(request: Request):
+    tables = db.get_tables() or []
+    table_counts = {}
+    for table in tables:
+        table_counts[table] = db.get_table_count(table)
     
-    if table and table in table_list:
-        columns_info = db_handler.get_table_structure(table) or []
-        total_rows = db_handler.count_table_rows(table)
-        page_count = (total_rows + rows_per_page - 1) // rows_per_page
-        
-        page = max(1, min(page, page_count))
-        offset = (page - 1) * rows_per_page
-        
-        table_data = db_handler.fetch_table_data(table, limit=rows_per_page, offset=offset) or []
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "tables": tables,
+        "table_counts": table_counts
+    })
+
+# ==================== ФОРМЫ ДЛЯ ОПЕРАЦИЙ С ДАННЫМИ ====================
+@app.get("/data", response_class=HTMLResponse)
+async def data_forms(request: Request, table: str = "", page: int = 1):
+    tables = db.get_tables() or []
+    columns = []
+    data = []
+    total_count = 0
+    total_pages = 0
+    per_page = 200
     
-    return templates.TemplateResponse("tables.html", {
+    if table and table in tables:
+        columns = db.get_table_columns(table) or []
+        total_count = db.get_table_count(table)
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        if page < 1:
+            page = 1
+        if page > total_pages:
+            page = total_pages
+            
+        offset = (page - 1) * per_page
+        data = db.get_table_data(table, limit=per_page, offset=offset) or []
+    
+    return templates.TemplateResponse("data_forms.html", {
         "request": request,
-        "all_tables": table_list,
-        "selected_table": table,
-        "columns": columns_info,
-        "data": table_data,
-        "current_page": page,
-        "rows_per_page": rows_per_page,
-        "total_rows": total_rows,
-        "page_count": page_count
+        "tables": tables,
+        "current_table": table,
+        "columns": columns,
+        "data": data,
+        "page": page,
+        "per_page": per_page,
+        "total_count": total_count,
+        "total_pages": total_pages
     })
 
-@app.get("/query", response_class=HTMLResponse)
-async def query_interface(request: Request):
-    """SQL query interface"""
-    table_list = db_handler.get_table_names() or []
-    return templates.TemplateResponse("query.html", {
-        "request": request,
-        "tables": table_list
-    })
-
-@app.get("/tools", response_class=HTMLResponse)
-async def tools_panel(request: Request):
-    """Database tools and utilities"""
-    table_list = db_handler.get_table_names() or []
-    return templates.TemplateResponse("tools.html", {
-        "request": request,
-        "tables": table_list
-    })
-
-@app.get("/api/status")
-async def api_status():
-    """API status endpoint"""
-    return format_response(
-        success=True,
-        message="Database Management Interface is operational",
-        data={
-            "version": "2.0.0",
-            "timestamp": get_current_timestamp(),
-            "database": "Connected" if db_handler.get_table_names() else "Disconnected"
-        }
-    )
-
-@app.get("/api/tables")
-async def api_get_tables():
-    """Get list of all tables"""
-    try:
-        tables = db_handler.get_table_names()
-        return format_response(
-            success=True,
-            data={"tables": tables},
-            message=f"Found {len(tables)} tables"
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Failed to retrieve tables: {str(e)}"
-        )
-
-@app.get("/api/tables/{table_name}/structure")
-async def api_get_table_structure(table_name: str):
-    """Get table structure"""
-    try:
-        structure = db_handler.get_table_structure(table_name)
-        return format_response(
-            success=True,
-            data={"structure": structure},
-            message=f"Structure for table '{table_name}'"
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Failed to get table structure: {str(e)}"
-        )
-
-@app.post("/api/tables/{table_name}/data")
-async def api_insert_data(
-    table_name: str,
-    row_data: str = Form(...)
+@app.post("/api/data/insert")
+async def insert_data(
+    table: str = Form(...),
+    data: str = Form(...)
 ):
-    """Insert data into table"""
     try:
-        data_dict = json.loads(row_data)
-        inserted_id = db_handler.add_table_row(table_name, data_dict)
-        
-        if inserted_id:
-            return format_response(
-                success=True,
-                data={"inserted_id": inserted_id},
-                message=f"Row added to '{table_name}' with ID: {inserted_id}"
-            )
-        else:
-            return format_response(
-                success=False,
-                error=f"Failed to insert data into '{table_name}'"
-            )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Data insertion error: {str(e)}"
-        )
-
-@app.put("/api/tables/{table_name}/data")
-async def api_update_data(
-    table_name: str,
-    update_data: str = Form(...),
-    filter_condition: str = Form(...)
-):
-    """Update table data"""
-    try:
-        data_dict = json.loads(update_data)
-        cleaned_data = {k: v for k, v in data_dict.items() if v is not None and v != ''}
-        
-        if not cleaned_data:
-            return format_response(
-                success=False,
-                error="No data provided for update"
-            )
-        
-        result = db_handler.modify_table_data(table_name, cleaned_data, filter_condition)
-        
+        data_dict = json.loads(data)
+        result = db.insert_data(table, data_dict)
         if result:
-            return format_response(
-                success=True,
-                message=f"Data updated in '{table_name}' with cascade processing"
-            )
+            return {"success": True, "message": f"Добавлена запись с ID: {result}", "id": result}
+        else:
+            return {"success": False, "error": "Не удалось добавить запись"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/data/update")
+async def update_data(
+    table: str = Form(...),
+    data: str = Form(...),
+    condition: str = Form(...)
+):
+    try:
+        data_dict = json.loads(data)
+        # Фильтруем пустые значения
+        filtered_data = {k: v for k, v in data_dict.items() if v is not None and v != ''}
+        
+        if not filtered_data:
+            return {"success": False, "error": "Нет данных для обновления"}
+        
+        result = db.update_data(table, filtered_data, condition)
+        if result:
+            return {"success": True, "message": "Данные обновлены с учетом связанных таблиц"}
         elif result is False:
-            return format_response(
-                success=False,
-                error=f"No rows found matching condition in '{table_name}'"
-            )
+            return {"success": False, "error": "Не найдены записи для обновления"}
         else:
-            return format_response(
-                success=False,
-                error=f"Update operation failed for '{table_name}'"
-            )
+            return {"success": False, "error": "Ошибка при обновлении данных"}
     except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Update error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.delete("/api/tables/{table_name}/data")
-async def api_delete_data(
-    table_name: str,
-    filter_condition: str = Form(...),
-    cascade_mode: bool = Form(False)
+@app.post("/api/data/delete")
+async def delete_data(
+    table: str = Form(...),
+    condition: str = Form(...),
+    cascade: bool = Form(False)  # Добавляем параметр каскадного удаления
 ):
-    """Delete data from table"""
     try:
-        if not filter_condition or filter_condition.strip() == "":
-            return format_response(
-                success=False,
-                error="Deletion condition cannot be empty"
-            )
+        if not condition or condition.strip() == "":
+            return {"success": False, "error": "Условие не может быть пустым"}
         
-        if cascade_mode:
-            result = db_handler.remove_table_data(table_name, filter_condition)
+        if cascade:
+            # Каскадное удаление
+            result = db.delete_data(table, condition)
             if result:
-                return format_response(
-                    success=True,
-                    message=f"Data removed from '{table_name}' with cascade deletion"
-                )
+                return {"success": True, "message": "Данные удалены с учетом связанных таблиц"}
             else:
-                return format_response(
-                    success=False,
-                    error=f"Cascade deletion failed for '{table_name}'"
-                )
+                return {"success": False, "error": "Ошибка при каскадном удалении"}
         else:
-            result = db_handler.safe_remove_table_data(table_name, filter_condition)
-            
+            # Безопасное удаление (проверка зависимостей)
+            result = db.delete_data_safe(table, condition)
             if isinstance(result, dict):
-                if result.get('status'):
-                    return format_response(
-                        success=True,
-                        data={"affected_rows": result.get('rows_affected', 0)},
-                        message=f"Removed {result.get('rows_affected', 0)} rows from '{table_name}'"
-                    )
+                if result.get('success'):
+                    return {
+                        "success": True, 
+                        "message": f"Удалено записей: {result.get('affected_rows', 0)}"
+                    }
                 else:
-                    if result.get('error_type') == 'dependencies_exist':
-                        dependencies = result.get('dependency_list', [])
-                        dep_details = "\n".join([f"- {d['table']}: {d['count']} rows" for d in dependencies])
-                        
-                        return format_response(
-                            success=False,
-                            data={
-                                "has_dependencies": True,
-                                "dependencies": dependencies
-                            },
-                            error=f"Cannot delete due to existing dependencies:\n{dep_details}\n\nUse cascade mode to delete all related data."
-                        )
+                    if result.get('error') == 'Есть зависимые записи':
+                        dependencies = result.get('dependencies', [])
+                        dep_message = "\n".join([f"- {d['table']}: {d['count']} записей" for d in dependencies])
+                        return {
+                            "success": False, 
+                            "error": f"Нельзя удалить записи, так как есть связанные данные:\n{dep_message}\n\nИспользуйте каскадное удаление.",
+                            "has_dependencies": True,
+                            "dependencies": dependencies
+                        }
                     else:
-                        return format_response(
-                            success=False,
-                            error=result.get('error_message', 'Unknown deletion error')
-                        )
+                        return {"success": False, "error": result.get('error', 'Неизвестная ошибка')}
             else:
-                return format_response(
-                    success=False,
-                    error=f"Deletion operation failed for '{table_name}'"
-                )
+                return {"success": False, "error": "Ошибка при удалении данных"}
     except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Deletion error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.delete("/api/tables/{table_name}")
-async def api_delete_table(table_name: str):
-    """Delete entire table"""
+# ==================== УДАЛЕНИЕ ТАБЛИЦ ====================
+@app.post("/api/table/delete")
+async def delete_table(table: str = Form(...)):
+    """Удалить таблицу"""
     try:
-        result = db_handler.drop_database_table(table_name)
+        if not table:
+            return {"success": False, "error": "Не указана таблица"}
+        
+        result = db.drop_table(table)
         if result:
-            return format_response(
-                success=True,
-                message=f"Table '{table_name}' has been removed"
-            )
+            return {"success": True, "message": f"Таблица '{table}' удалена"}
         else:
-            return format_response(
-                success=False,
-                error=f"Failed to remove table '{table_name}'"
-            )
+            return {"success": False, "error": f"Не удалось удалить таблицу '{table}'"}
     except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Table deletion error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.post("/api/query/execute")
-async def api_execute_query(
-    query_text: str = Form(...),
-    query_params: str = Form("")
-):
-    """Execute SQL query"""
+# ==================== ЭКСПОРТ ОТДЕЛЬНОЙ ТАБЛИЦЫ ====================
+@app.get("/api/export/table/{table_name}/{format}")
+async def export_table(table_name: str, format: str):
+    """Экспорт отдельной таблицы"""
     try:
-        params_dict = {}
-        if query_params and query_params.strip():
-            try:
-                params_dict = json.loads(query_params)
-            except json.JSONDecodeError as e:
-                return format_response(
-                    success=False,
-                    error=f"Invalid parameters format: {str(e)}"
-                )
-        
-        query_result = db_handler.run_sql_query(query_text, params_dict)
-        
-        return format_response(
-            success=True,
-            data={
-                "result": query_result,
-                "row_count": len(query_result) if query_result else 0
-            },
-            message="Query executed successfully"
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Query execution error: {str(e)}"
-        )
-
-@app.post("/api/export/query")
-async def api_export_query_result(
-    query_text: str = Form(...),
-    query_params: str = Form(""),
-    export_format: str = Form("excel")
-):
-    """Export query results"""
-    try:
-        params_dict = {}
-        if query_params and query_params.strip():
-            try:
-                params_dict = json.loads(query_params)
-            except json.JSONDecodeError as e:
-                return format_response(
-                    success=False,
-                    error=f"Invalid parameters format: {str(e)}"
-                )
-        
-        query_result = db_handler.run_sql_query(query_text, params_dict)
-        
-        if not query_result:
-            return format_response(
-                success=False,
-                error="No data available for export"
-            )
-        
-        if export_format == "excel":
-            filepath, error = db_handler.export_query_to_spreadsheet(query_result)
-            
+        if format == "excel":
+            filepath, filename = db.export_table_to_excel(table_name)
             if filepath:
-                filename = f"query_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
                 return FileResponse(
                     filepath,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     filename=filename
                 )
             else:
-                return format_response(
-                    success=False,
-                    error=error or "Failed to create export file"
-                )
+                return {"success": False, "error": filename}  # filename содержит сообщение об ошибке
         
-        elif export_format == "json":
-            json_data = json.dumps(query_result, ensure_ascii=False, indent=2, default=str)
-            filename = f"query_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        elif format == "json":
+            filepath, filename = db.export_table_to_json(table_name)
+            if filepath:
+                return FileResponse(
+                    filepath,
+                    media_type="application/json",
+                    filename=filename
+                )
+            else:
+                return {"success": False, "error": filename}  # filename содержит сообщение об ошибке
+        
+        else:
+            return {"success": False, "error": "Неподдерживаемый формат экспорта"}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# ==================== КОНСТРУКТОР ЗАПРОСОВ ====================
+@app.get("/query", response_class=HTMLResponse)
+async def query_builder(request: Request):
+    tables = db.get_tables() or []
+    return templates.TemplateResponse("query_builder.html", {
+        "request": request,
+        "tables": tables
+    })
+
+@app.post("/api/query/execute")
+async def execute_query(
+    sql: str = Form(...),
+    params: str = Form("")
+):
+    """Выполнить SQL запрос с параметрами"""
+    try:
+        # Парсим параметры
+        params_dict = {}
+        if params and params.strip():
+            try:
+                params_dict = json.loads(params)
+            except json.JSONDecodeError as e:
+                return {"success": False, "error": f"Ошибка в формате параметров JSON: {str(e)}"}
+        
+        # Выполняем запрос
+        result = db.execute_query(sql, params_dict)
+        
+        return {
+            "success": True,
+            "data": result,
+            "count": len(result) if result else 0
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/query/export")
+async def export_query_result(
+    sql: str = Form(...),
+    params: str = Form(""),
+    format: str = Form("csv")
+):
+    """Экспорт результатов SQL запроса"""
+    try:
+        # Парсим параметры
+        params_dict = {}
+        if params and params.strip():
+            try:
+                params_dict = json.loads(params)
+            except json.JSONDecodeError as e:
+                return {"success": False, "error": f"Ошибка в формате параметров JSON: {str(e)}"}
+        
+        # Выполняем запрос
+        result = db.execute_query(sql, params_dict)
+        
+        if not result:
+            return {"success": False, "error": "Нет данных для экспорта"}
+        
+        if format == "csv":
+            # Используем новый метод через временную таблицу
+            filepath, error = db.export_query_to_csv(result)
+            
+            if filepath:
+                filename = f"query_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                return FileResponse(
+                    filepath,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=filename
+                )
+            else:
+                return {"success": False, "error": error or "Ошибка при создании файла"}
+        
+        elif format == "json":
+            # Создаем JSON
+            json_data = json.dumps(result, ensure_ascii=False, indent=2, default=str)
+            filename = f"query_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             
             return JSONResponse({
-                "status": "success",
+                "success": True,
                 "filename": filename,
                 "content": json_data,
                 "format": "json"
             })
         
         else:
-            return format_response(
-                success=False,
-                error=f"Unsupported export format: {export_format}"
-            )
+            return {"success": False, "error": f"Неизвестный формат: {format}"}
             
     except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Export error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.post("/api/backup/create")
-async def api_create_backup():
-    """Create database backup"""
+# ==================== ЭКСПОРТ ДАННЫХ ====================
+@app.post("/api/export/tables")
+async def export_selected_tables(
+    tables: List[str] = Form(...),
+    format: str = Form("excel")
+):
+    """Экспорт выбранных таблиц"""
     try:
-        backup_status, backup_path, error_message = db_handler.create_database_backup()
+        if not tables:
+            return {"success": False, "error": "Не выбраны таблицы для экспорта"}
         
-        if backup_status:
-            return format_response(
-                success=True,
-                data={"backup_path": backup_path},
-                message=f"Database backup created: {backup_path}"
-            )
+        if format == "excel":
+            filepath, error = db.export_tables_to_excel(tables)
+            if filepath:
+                return FileResponse(
+                    filepath,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=Path(filepath).name
+                )
+            else:
+                return {"success": False, "error": error}
+        
+        elif format == "json":
+            filepath, error = db.export_tables_to_json(tables)
+            if filepath:
+                return FileResponse(
+                    filepath,
+                    media_type="application/json",
+                    filename=Path(filepath).name
+                )
+            else:
+                return {"success": False, "error": error}
+        
         else:
-            return format_response(
-                success=False,
-                error=error_message
-            )
+            return {"success": False, "error": "Неподдерживаемый формат экспорта"}
+            
     except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Backup creation error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.post("/api/backup/restore")
-async def api_restore_backup(backup_file: UploadFile = File(...)):
-    """Restore database from backup"""
+@app.get("/api/export/all/{format}")
+async def export_all_tables(format: str):
+    """Экспорт всех таблиц"""
     try:
-        if not backup_file.filename:
-            return format_response(
-                success=False,
-                error="No backup file selected"
-            )
+        if format == "excel":
+            filepath, error = db.export_all_to_excel()
+            if filepath:
+                return FileResponse(
+                    filepath,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=Path(filepath).name
+                )
+            else:
+                return {"success": False, "error": error}
         
-        if not backup_file.filename.lower().endswith('.backup'):
-            return format_response(
-                success=False,
-                error="Only PostgreSQL .backup files are supported"
-            )
+        elif format == "json":
+            filepath, error = db.export_all_to_json()
+            if filepath:
+                return FileResponse(
+                    filepath,
+                    media_type="application/json",
+                    filename=Path(filepath).name
+                )
+            else:
+                return {"success": False, "error": error}
         
+        else:
+            return {"success": False, "error": "Неподдерживаемый формат экспорта"}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# ==================== СЕРВИСНЫЕ ФУНКЦИИ ====================
+@app.get("/service", response_class=HTMLResponse)
+async def service_page(request: Request):
+    tables = db.get_tables() or []
+    return templates.TemplateResponse("service.html", {
+        "request": request,
+        "tables": tables
+    })
+
+@app.post("/api/service/backup")
+async def create_backup():
+    """Создание полного бэкапа базы данных"""
+    try:
+        success, backup_file, error = db.create_backup()
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Бэкап создан: {backup_file}",
+                "file": backup_file
+            }
+        else:
+            return {"success": False, "error": error}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/service/restore")
+async def restore_backup(file: UploadFile = File(...)):
+    """Восстановление БД из файла .backup"""
+    try:
+        if not file.filename:
+            return {"success": False, "error": "Файл не выбран"}
+        
+        # Проверяем расширение файла
+        if not file.filename.lower().endswith('.backup'):
+            return {"success": False, "error": "Поддерживаются только файлы .backup"}
+        
+        # Сохраняем файл во временную директорию
         temp_dir = tempfile.gettempdir()
-        temp_file_path = os.path.join(temp_dir, backup_file.filename)
+        temp_file_path = os.path.join(temp_dir, file.filename)
         
         with open(temp_file_path, 'wb') as f:
-            file_content = await backup_file.read()
-            f.write(file_content)
+            content = await file.read()
+            f.write(content)
         
-        restore_status, restore_message = db_handler.restore_database_backup(temp_file_path)
+        # Восстанавливаем БД
+        success, message = db.restore_backup(temp_file_path)
         
+        # Удаляем временный файл
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
         
-        if restore_status:
-            return format_response(
-                success=True,
-                message=restore_message + " - Refreshing interface in 3 seconds..."
-            )
+        if success:
+            return {
+                "success": True,
+                "message": message + " - страница обновится через 3 секунды..."
+            }
         else:
-            if "unrecognized configuration parameter \"transaction_timeout\"" in restore_message:
-                return format_response(
-                    success=True,
-                    message="Restoration completed with warnings ignored - Refreshing interface in 3 seconds..."
-                )
-            return format_response(
-                success=False,
-                error=restore_message
-            )
+            # Проверяем, если ошибка только из-за transaction_timeout
+            if "unrecognized configuration parameter \"transaction_timeout\"" in message:
+                return {
+                    "success": True,
+                    "message": "Восстановление выполнено с игнорированием предупреждений - страница обновится через 3 секунды..."
+                }
+            return {
+                "success": False,
+                "error": message
+            }
+            
     except Exception as e:
+        # Удаляем временный файл при исключении
         if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
         
-        return format_response(
-            success=False,
-            error=f"Restoration error: {str(e)}"
-        )
+        return {"success": False, "error": str(e)}
 
-@app.post("/api/archive/tables")
-async def api_archive_tables(
-    tables_to_archive: str = Form("[]"),
-    archive_all_flag: bool = Form(False)
+@app.post("/api/service/archive")
+async def archive_tables(
+    tables: str = Form("[]"),  # Изменено: получаем как строку JSON
+    archive_all: bool = Form(False)
 ):
-    """Archive selected tables"""
+    """Архивация таблиц"""
     try:
-        if archive_all_flag:
-            archive_status, archive_result = db_handler.archive_all_database_tables()
+        print(f"Archive request: tables={tables}, archive_all={archive_all}")
+        
+        if archive_all:
+            # Архивировать все таблицы
+            success, result = db.archive_all_tables()
         else:
+            # Архивировать выбранные таблицы
             try:
-                tables_list = json.loads(tables_to_archive)
+                tables_list = json.loads(tables)
                 if not isinstance(tables_list, list):
                     tables_list = []
             except:
                 tables_list = []
             
             if not tables_list:
-                return format_response(
-                    success=False,
-                    error="Select tables for archiving"
-                )
+                return {"success": False, "error": "Выберите таблицы для архивации"}
             
-            archive_status, archive_result = db_handler.archive_database_tables(tables_list)
+            success, result = db.archive_tables(tables_list)
         
-        if archive_status:
-            return format_response(
-                success=True,
-                data={
-                    "archive_directory": archive_result.get("archive_dir"),
-                    "tables_processed": archive_result.get("tables_archived"),
-                    "total_tables": archive_result.get("total_tables", 0),
-                    "details": archive_result.get("details", [])
-                },
-                message=archive_result.get("message", "Archiving completed")
-            )
+        if success:
+            return {
+                "success": True,
+                "message": result["message"],
+                "archive_dir": result["archive_dir"],
+                "tables_archived": result["tables_archived"],
+                "total_tables": result.get("total_tables", 0),
+                "details": result.get("details", [])
+            }
         else:
-            return format_response(
-                success=False,
-                error=archive_result
-            )
+            return {"success": False, "error": result}
+            
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Archive processing error: {str(e)}\n{error_details}")
-        return format_response(
-            success=False,
-            error=f"Archiving error: {str(e)}"
-        )
+        print(f"Archive error: {str(e)}\n{error_details}")
+        return {"success": False, "error": str(e)}
 
-@app.get("/api/files/backups")
-async def api_get_backup_files():
-    """Get list of backup files"""
-    try:
-        backup_files = db_handler.list_backup_files()
-        return format_response(
-            success=True,
-            data={"files": backup_files}
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Failed to list backup files: {str(e)}"
-        )
-
-@app.get("/api/files/exports")
-async def api_get_export_files():
-    """Get list of export files"""
-    try:
-        export_files = db_handler.list_export_files()
-        return format_response(
-            success=True,
-            data={"files": export_files}
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Failed to list export files: {str(e)}"
-        )
-
-@app.get("/api/files/archives")
-async def api_get_archive_files():
-    """Get list of archive files"""
-    try:
-        archive_files = db_handler.list_archive_files()
-        return format_response(
-            success=True,
-            data={"files": archive_files}
-        )
-    except Exception as e:
-        return format_response(
-            success=False,
-            error=f"Failed to list archive files: {str(e)}"
-        )
-
-@app.get("/api/download/{category}/{filename}")
-async def api_download_file(category: str, filename: str):
-    """Download file from server"""
-    filepath = Path(category) / filename
+# ==================== ЗАГРУЗКА ФАЙЛОВ ====================
+@app.get("/api/service/download/{folder}/{filename}")
+async def download_file(folder: str, filename: str):
+    """Скачать файл из папки"""
+    filepath = Path(folder) / filename
     
     if not filepath.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="Файл не найден")
     
-    extension_map = {
-        '.backup': 'application/octet-stream',
-        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        '.json': 'application/json',
-        '.sql': 'text/plain',
-        '.csv': 'text/csv'
-    }
-    
-    file_extension = filepath.suffix.lower()
-    media_type = extension_map.get(file_extension, 'application/octet-stream')
+    # Определяем Content-Type по расширению
+    ext = filepath.suffix.lower()
+    if ext == '.backup':
+        media_type = "application/octet-stream"
+    elif ext == '.xlsx':
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif ext == '.json':
+        media_type = "application/json"
+    elif ext == '.sql':
+        media_type = "text/plain"
+    elif ext == '.csv':
+        media_type = "text/csv"
+    else:
+        media_type = "application/octet-stream"
     
     return FileResponse(
         str(filepath),
@@ -623,30 +541,45 @@ async def api_download_file(category: str, filename: str):
         filename=filename
     )
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "database-management-interface",
-        "timestamp": get_current_timestamp(),
-        "version": "2.0.0"
-    }
+# ==================== ПОЛУЧЕНИЕ СПИСКА ФАЙЛОВ ====================
+@app.get("/api/service/backup-files")
+async def get_backup_files():
+    """Получить список файлов бэкапов"""
+    try:
+        files = db.get_backup_files()
+        return {"success": True, "files": files}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/service/export-files")
+async def get_export_files():
+    """Получить список файлов экспортов"""
+    try:
+        files = db.get_export_files()
+        return {"success": True, "files": files}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/service/archive-files")
+async def get_archive_files():
+    """Получить список файлов архивов"""
+    try:
+        files = db.get_archive_files()
+        return {"success": True, "files": files}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
-    server_host = os.getenv('APP_HOST', '0.0.0.0')
-    server_port = int(os.getenv('APP_PORT', 3000))
+    host = os.getenv('APP_HOST', '0.0.0.0')
+    port = int(os.getenv('APP_PORT', 3000))
     
-    print(f"Database Management Interface")
-    print(f"Server: http://{server_host}:{server_port}")
-    print(f"API Documentation: http://{server_host}:{server_port}/docs")
-    print(f"Health Check: http://{server_host}:{server_port}/health")
+    print(f"Сервер запущен на http://localhost:{port}")
+    print(f"Доступно по http://127.0.0.1:{port}")
     
     uvicorn.run(
-        app,
-        host=server_host,
-        port=server_port,
-        log_level="info"
+        "main:app",
+        host=host,
+        port=port,
+        reload=True
     )
