@@ -102,7 +102,7 @@ async def data_forms(request: Request, table: str = "", page: int = 1):
             offset = (page - 1) * per_page
             data = db.get_table_data(table, limit=per_page, offset=offset) or []
         
-        return templates.TemplateResponse("data_forms.html", {
+        return templates.TemplateResponse("data.html", {
             "request": request,
             "tables": tables,
             "current_table": table,
@@ -115,7 +115,7 @@ async def data_forms(request: Request, table: str = "", page: int = 1):
         })
     except Exception as e:
         print(f"Error in data_forms route: {e}")
-        return templates.TemplateResponse("data_forms.html", {
+        return templates.TemplateResponse("data.html", {
             "request": request,
             "tables": [],
             "current_table": table,
@@ -282,13 +282,13 @@ async def export_table(table_name: str, format: str):
 async def query_builder(request: Request):
     try:
         tables = db.get_tables() or []
-        return templates.TemplateResponse("query_builder.html", {
+        return templates.TemplateResponse("query.html", {
             "request": request,
             "tables": tables
         })
     except Exception as e:
         print(f"Error in query_builder route: {e}")
-        return templates.TemplateResponse("query_builder.html", {
+        return templates.TemplateResponse("query.html", {
             "request": request,
             "tables": []
         })
