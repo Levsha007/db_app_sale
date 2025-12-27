@@ -85,33 +85,14 @@ class Database:
     
     def get_tables(self):
         """Получить список всех таблиц"""
-        try:
-            query = """
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-                ORDER BY table_name
-            """
-            result = self.execute_query(query)
-            if result:
-                return [row['table_name'] for row in result]
-            return []
-        except Exception as e:
-            print(f"Ошибка при получении таблиц: {e}")
-            return []
-    
-    def get_total_records_count(self):
-        """Получить общее количество записей во всех таблицах"""
-        try:
-            tables = self.get_tables()
-            total = 0
-            for table in tables:
-                count = self.get_table_count(table)
-                total += count
-            return total
-        except Exception as e:
-            print(f"Ошибка при подсчете всех записей: {e}")
-            return 0
+        query = """
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """
+        result = self.execute_query(query)
+        return [row['table_name'] for row in result] if result else []
     
     def get_table_columns(self, table_name):
         """Получить колонки таблицы"""
@@ -121,8 +102,23 @@ class Database:
             WHERE table_name = %s
             ORDER BY ordinal_position
         """
+        return self.execute_query(query, (table_name,))
+    
+    def get_primary_key(self, table_name):
+        """Получить первичный ключ таблицы"""
+        query = """
+            SELECT kcu.column_name
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+            WHERE tc.table_name = %s 
+            AND tc.constraint_type = 'PRIMARY KEY'
+            ORDER BY kcu.ordinal_position
+        """
         result = self.execute_query(query, (table_name,))
-        return result if result else []
+        if result and len(result) > 0:
+            return result[0]['column_name']
+        return None
     
     def get_table_constraints(self, table_name):
         """Получить информацию о внешних ключах таблицы"""
@@ -143,7 +139,7 @@ class Database:
             AND tc.constraint_type IN ('FOREIGN KEY', 'PRIMARY KEY')
             ORDER BY tc.constraint_type, kcu.ordinal_position;
         """
-        return self.execute_query(query, (table_name,)) or []
+        return self.execute_query(query, (table_name,))
     
     def get_referencing_tables(self, table_name, column_name=None):
         """Получить таблицы, которые ссылаются на данную таблицу"""
@@ -162,12 +158,12 @@ class Database:
             AND ccu.table_name = %s
             AND (%s IS NULL OR ccu.column_name = %s)
         """
-        return self.execute_query(query, (table_name, column_name, column_name)) or []
+        return self.execute_query(query, (table_name, column_name, column_name))
     
     def get_table_data(self, table_name, limit=None, offset=0):
         """Получить данные из таблицы"""
         try:
-            # Используем кавычки для имен таблиц
+            # Используем кавычки для имен таблиц с пробелами или специальными символами
             if limit:
                 query = f'SELECT * FROM "{table_name}" LIMIT %s OFFSET %s'
                 return self.execute_query(query, (limit, offset))
@@ -177,22 +173,6 @@ class Database:
         except Exception as e:
             print(f"Ошибка при получении данных таблицы {table_name}: {e}")
             return []
-    
-    def table_exists(self, table_name):
-        """Проверить существование таблицы"""
-        try:
-            query = """
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name = %s
-                )
-            """
-            result = self.execute_query(query, (table_name,))
-            return result[0]['exists'] if result else False
-        except Exception as e:
-            print(f"Ошибка при проверке существования таблицы {table_name}: {e}")
-            return False
     
     def get_table_count(self, table_name):
         """Получить количество записей в таблице"""
@@ -207,121 +187,109 @@ class Database:
     def insert_data(self, table_name, data):
         """Вставить данные в таблицу"""
         try:
+            # Используем кавычки для имен колонок
             columns = ', '.join([f'"{col}"' for col in data.keys()])
             placeholders = ', '.join(['%s'] * len(data))
-            query = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders}) RETURNING id'
+            
+            # Получаем первичный ключ для RETURNING
+            primary_key = self.get_primary_key(table_name)
+            if primary_key:
+                query = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders}) RETURNING "{primary_key}"'
+            else:
+                query = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders})'
+            
             result = self.execute_query(query, tuple(data.values()))
-            return result[0]['id'] if result else None
+            
+            if result and primary_key:
+                return result[0][primary_key]
+            return None
         except Exception as e:
             print(f"Ошибка при вставке данных в таблицу {table_name}: {e}")
             return None
     
     def update_data(self, table_name, data, condition):
-        """Обновить данные в таблице с каскадным обновлением"""
+        """Обновить данные в таблице"""
         try:
+            if not condition or condition.strip() == "":
+                return {"success": False, "error": "Условие не может быть пустым"}
+            
+            # Фильтруем пустые значения
+            filtered_data = {k: v for k, v in data.items() if v is not None and v != ''}
+            if not filtered_data:
+                return {"success": False, "error": "Нет данных для обновления"}
+            
+            # Создаем SET часть запроса
+            set_parts = []
+            values = []
+            
+            for key, value in filtered_data.items():
+                set_parts.append(f'"{key}" = %s')
+                values.append(value)
+            
+            set_clause = ', '.join(set_parts)
+            
+            # ВАЖНО: Не добавляем condition в values, так как оно уже встроено в строку запроса
+            # Формируем полный запрос
+            query = f'UPDATE "{table_name}" SET {set_clause} WHERE {condition}'
+            
+            # Выполняем запрос
             conn = self.get_connection()
             if not conn:
-                return None
+                return {"success": False, "error": "Не удалось подключиться к БД"}
             
             cursor = conn.cursor()
-            
-            # Получаем старые значения для каскадного обновления
-            get_old_values_query = f'SELECT * FROM "{table_name}" WHERE {condition}'
-            cursor.execute(get_old_values_query)
-            old_rows = cursor.fetchall()
-            
-            if not old_rows:
-                conn.close()
-                return False
-            
-            results = []
-            
-            for old_row in old_rows:
-                old_row_dict = dict(zip([desc[0] for desc in cursor.description], old_row))
-                
-                # Создаем обновленный словарь данных
-                updated_data = old_row_dict.copy()
-                for key, value in data.items():
-                    if value:  # Обновляем только если передано значение
-                        updated_data[key] = value
-                
-                # Получаем внешние ключи для этой таблицы
-                fk_query = """
-                    SELECT
-                        kcu.column_name,
-                        ccu.table_name AS foreign_table_name,
-                        ccu.column_name AS foreign_column_name
-                    FROM information_schema.table_constraints AS tc
-                    JOIN information_schema.key_column_usage AS kcu
-                        ON tc.constraint_name = kcu.constraint_name
-                    JOIN information_schema.constraint_column_usage AS ccu
-                        ON ccu.constraint_name = tc.constraint_name
-                    WHERE tc.table_name = %s
-                    AND tc.constraint_type = 'FOREIGN KEY'
-                """
-                cursor.execute(fk_query, (table_name,))
-                foreign_keys = cursor.fetchall()
-                
-                # Обновляем связанные таблицы если обновляются FK
-                for fk in foreign_keys:
-                    local_column = fk[0]
-                    foreign_table = fk[1]
-                    foreign_column = fk[2]
-                    
-                    # Если обновляется колонка с внешним ключом
-                    if local_column in data and data[local_column]:
-                        old_value = old_row_dict[local_column]
-                        new_value = data[local_column]
-                        
-                        if old_value != new_value:
-                            # Обновляем связанные записи
-                            update_related_query = f'UPDATE "{foreign_table}" SET "{foreign_column}" = %s WHERE "{foreign_column}" = %s'
-                            cursor.execute(update_related_query, (new_value, old_value))
-                
-                # Выполняем основное обновление
-                set_clause = ', '.join([f'"{k}" = %s' for k in data.keys() if data[k]])
-                values = [data[k] for k in data.keys() if data[k]]
-                
-                # Добавляем условие для конкретной строки
-                where_condition = " AND ".join([f'"{k}" = %s' for k in old_row_dict.keys()])
-                where_values = list(old_row_dict.values())
-                
-                update_query = f'UPDATE "{table_name}" SET {set_clause} WHERE {where_condition}'
-                
-                cursor.execute(update_query, values + where_values)
-                results.append(cursor.rowcount > 0)
-            
+            cursor.execute(query, tuple(values))
+            affected_rows = cursor.rowcount
             conn.commit()
             conn.close()
             
-            return any(results)
+            return {
+                "success": True,
+                "affected_rows": affected_rows,
+                "message": f"Обновлено {affected_rows} записей"
+            }
             
         except Exception as e:
-            print(f"Ошибка при обновлении данных: {e}")
-            return None
+            print(f"Ошибка при обновлении данных в таблице {table_name}: {e}")
+            return {"success": False, "error": str(e)}
     
-    def delete_data(self, table_name, condition):
-        """Удалить данные из таблицы с каскадным удалением"""
+    def delete_data(self, table_name, condition, cascade=False):
+        """Удалить данные из таблицы"""
         try:
+            if not condition or condition.strip() == "":
+                return {"success": False, "error": "Условие не может быть пустым"}
+            
             conn = self.get_connection()
             if not conn:
-                return None
+                return {"success": False, "error": "Не удалось подключиться к БД"}
             
             cursor = conn.cursor()
             
-            # Получаем таблицы, которые ссылаются на эту таблицу
-            referencing_tables = self.get_referencing_tables(table_name)
-            
-            # Сначала удаляем из дочерних таблиц
-            for ref_table in referencing_tables:
-                ref_table_name = ref_table['referencing_table']
-                ref_column = ref_table['referencing_column']
+            if cascade:
+                # Получаем таблицы, которые ссылаются на эту таблицу
+                referencing_tables = self.get_referencing_tables(table_name)
                 
-                # Получаем условие для JOIN
-                delete_ref_query = f'DELETE FROM "{ref_table_name}" WHERE "{ref_column}" IN (SELECT id FROM "{table_name}" WHERE {condition})'
-                cursor.execute(delete_ref_query)
+                # Удаляем из дочерних таблиц
+                for ref_table in referencing_tables:
+                    ref_table_name = ref_table['referencing_table']
+                    ref_column = ref_table['referencing_column']
+                    
+                    # Получаем первичный ключ основной таблицы
+                    primary_key = self.get_primary_key(table_name)
+                    if not primary_key:
+                        # Если нет PK, используем все колонки для условия
+                        # Формируем подзапрос для получения значений, которые будут удалены
+                        subquery = f'SELECT "{ref_column}" FROM "{table_name}" WHERE {condition}'
+                        delete_ref_query = f'DELETE FROM "{ref_table_name}" WHERE "{ref_column}" IN ({subquery})'
+                    else:
+                        # Используем первичный ключ для формирования подзапроса
+                        subquery = f'SELECT "{primary_key}" FROM "{table_name}" WHERE {condition}'
+                        delete_ref_query = f'DELETE FROM "{ref_table_name}" WHERE "{ref_column}" IN ({subquery})'
+                    
+                    cursor.execute(delete_ref_query)
+                    print(f"Каскадное удаление из таблицы {ref_table_name}: {cursor.rowcount} записей")
             
-            # Теперь удаляем из основной таблиции
+            # Удаляем из основной таблицы
             delete_query = f'DELETE FROM "{table_name}" WHERE {condition}'
             cursor.execute(delete_query)
             
@@ -329,19 +297,25 @@ class Database:
             conn.commit()
             conn.close()
             
-            return affected_rows > 0
+            return {
+                "success": True,
+                "affected_rows": affected_rows,
+                "message": f"Удалено {affected_rows} записей"
+            }
             
         except Exception as e:
-            print(f"Ошибка при удалении данных: {e}")
-            return None
+            print(f"Ошибка при удалении данных из таблицы {table_name}: {e}")
+            return {"success": False, "error": str(e)}
     
     def delete_data_safe(self, table_name, condition):
-        """Безопасное удаление данных (без каскада)"""
+        """Безопасное удаление данных (без каскада) с проверкой зависимостей"""
         try:
-            # Проверяем наличие зависимых записей
+            if not condition or condition.strip() == "":
+                return {"success": False, "error": "Условие не может быть пустым"}
+            
             conn = self.get_connection()
             if not conn:
-                return None
+                return {"success": False, "error": "Не удалось подключиться к БД"}
             
             cursor = conn.cursor()
             
@@ -355,8 +329,17 @@ class Database:
                 ref_table_name = ref_table['referencing_table']
                 ref_column = ref_table['referencing_column']
                 
-                # Проверяем есть ли зависимые записи
-                check_query = f'SELECT COUNT(*) FROM "{ref_table_name}" WHERE "{ref_column}" IN (SELECT id FROM "{table_name}" WHERE {condition})'
+                # Получаем первичный ключ основной таблицы
+                primary_key = self.get_primary_key(table_name)
+                if primary_key:
+                    # Формируем подзапрос для получения значений
+                    subquery = f'SELECT "{primary_key}" FROM "{table_name}" WHERE {condition}'
+                    check_query = f'SELECT COUNT(*) FROM "{ref_table_name}" WHERE "{ref_column}" IN ({subquery})'
+                else:
+                    # Если нет PK, проверяем по всем колонкам
+                    subquery = f'SELECT "{ref_column}" FROM "{table_name}" WHERE {condition}'
+                    check_query = f'SELECT COUNT(*) FROM "{ref_table_name}" WHERE "{ref_column}" IN ({subquery})'
+                
                 cursor.execute(check_query)
                 count = cursor.fetchone()[0]
                 
@@ -364,6 +347,7 @@ class Database:
                     has_dependencies = True
                     dependency_info.append({
                         'table': ref_table_name,
+                        'column': ref_column,
                         'count': count
                     })
             
@@ -372,6 +356,7 @@ class Database:
                 return {
                     'success': False,
                     'error': 'Есть зависимые записи',
+                    'has_dependencies': True,
                     'dependencies': dependency_info
                 }
             
@@ -385,7 +370,8 @@ class Database:
             
             return {
                 'success': True,
-                'affected_rows': affected_rows
+                'affected_rows': affected_rows,
+                'message': f'Удалено {affected_rows} записей'
             }
             
         except Exception as e:
@@ -418,7 +404,22 @@ class Database:
             print(f"Исключение при удалении таблицы {table_name}: {e}")
             return False
     
-    # ==================== НОВЫЙ МЕТОД: УДАЛЕНИЕ ВСЕХ ТАБЛИЦ ====================
+    def table_exists(self, table_name):
+        """Проверить существование таблицы"""
+        try:
+            query = """
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = %s
+                )
+            """
+            result = self.execute_query(query, (table_name,))
+            return result[0]['exists'] if result else False
+        except Exception as e:
+            print(f"Ошибка при проверке существования таблицы {table_name}: {e}")
+            return False
+    
     def reset_all_tables(self):
         """Удалить ВСЕ таблицы из базы данных"""
         try:
@@ -447,10 +448,6 @@ class Database:
             # Удаляем все таблицы каскадно
             for table_name in table_names:
                 try:
-                    # Отключаем внешние ключи для этой сессии
-                    cursor.execute('SET CONSTRAINTS ALL DEFERRED')
-                    
-                    # Удаляем таблицу с каскадом
                     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
                     tables_removed += 1
                     print(f"Удалена таблица: {table_name}")

@@ -269,8 +269,6 @@
 {% endif %}
 
 <style>
-/* Убираем дублирующиеся стили, так как они уже в style.css */
-
 @media (max-width: 1200px) {
     .grid-3 {
         grid-template-columns: repeat(2, 1fr);
@@ -316,8 +314,16 @@ async function insertData(e) {
         });
         
         const result = await response.json();
-        alert(result.message || result.error);
-        if (result.success) location.reload();
+        
+        if (result.success) {
+            alert(result.message);
+            // Используем более надежный способ перезагрузки
+            setTimeout(() => {
+                window.location.href = window.location.href;
+            }, 100);
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
     } catch (error) {
         alert('Ошибка: ' + error.message);
     }
@@ -358,8 +364,15 @@ async function updateData(e) {
         });
         
         const result = await response.json();
-        alert(result.message || result.error);
-        if (result.success) location.reload();
+        
+        if (result.success) {
+            alert(result.message);
+            setTimeout(() => {
+                window.location.href = window.location.href;
+            }, 100);
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
     } catch (error) {
         alert('Ошибка: ' + error.message);
     }
@@ -398,7 +411,9 @@ async function deleteData(e) {
         
         if (result.success) {
             alert(result.message);
-            location.reload();
+            setTimeout(() => {
+                window.location.href = window.location.href;
+            }, 100);
         } else {
             if (result.has_dependencies) {
                 let depMessage = 'Есть связанные данные:\n\n';
@@ -419,8 +434,15 @@ async function deleteData(e) {
                     });
                     
                     const cascadeResult = await cascadeResponse.json();
-                    alert(cascadeResult.message || cascadeResult.error);
-                    if (cascadeResult.success) location.reload();
+                    
+                    if (cascadeResult.success) {
+                        alert(cascadeResult.message);
+                        setTimeout(() => {
+                            window.location.href = window.location.href;
+                        }, 100);
+                    } else {
+                        alert('Ошибка: ' + cascadeResult.error);
+                    }
                 }
             } else {
                 alert('Ошибка: ' + result.error);

@@ -138,7 +138,7 @@ async def insert_data(
         if result:
             return {"success": True, "message": f"Добавлена запись с ID: {result}", "id": result}
         else:
-            return {"success": False, "error": "Не удалось добавить запись"}
+            return {"success": True, "message": "Запись добавлена", "id": result}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -157,12 +157,8 @@ async def update_data(
             return {"success": False, "error": "Нет данных для обновления"}
         
         result = db.update_data(table, filtered_data, condition)
-        if result:
-            return {"success": True, "message": "Данные обновлены с учетом связанных таблиц"}
-        elif result is False:
-            return {"success": False, "error": "Не найдены записи для обновления"}
-        else:
-            return {"success": False, "error": "Ошибка при обновлении данных"}
+        return result  # Метод update_data теперь возвращает словарь с результатом
+            
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -178,34 +174,13 @@ async def delete_data(
         
         if cascade:
             # Каскадное удаление
-            result = db.delete_data(table, condition)
-            if result:
-                return {"success": True, "message": "Данные удалены с учетом связанных таблиц"}
-            else:
-                return {"success": False, "error": "Ошибка при каскадном удалении"}
+            result = db.delete_data(table, condition, cascade=True)
+            return result
         else:
             # Безопасное удаление (проверка зависимостей)
             result = db.delete_data_safe(table, condition)
-            if isinstance(result, dict):
-                if result.get('success'):
-                    return {
-                        "success": True, 
-                        "message": f"Удалено записей: {result.get('affected_rows', 0)}"
-                    }
-                else:
-                    if result.get('error') == 'Есть зависимые записи':
-                        dependencies = result.get('dependencies', [])
-                        dep_message = "\n".join([f"- {d['table']}: {d['count']} записей" for d in dependencies])
-                        return {
-                            "success": False, 
-                            "error": f"Нельзя удалить записи, так как есть связанные данные:\n{dep_message}\n\nИспользуйте каскадное удаление.",
-                            "has_dependencies": True,
-                            "dependencies": dependencies
-                        }
-                    else:
-                        return {"success": False, "error": result.get('error', 'Неизвестная ошибка')}
-            else:
-                return {"success": False, "error": "Ошибка при удалении данных"}
+            return result
+            
     except Exception as e:
         return {"success": False, "error": str(e)}
 
