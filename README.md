@@ -20,7 +20,7 @@ cd <project-folder>
 # В корне проекта:
 echo "DB_HOST=postgres" > .env
 echo "DB_PORT=5432" >> .env
-echo "DB_NAME=my_app_db" >> .env
+echo "DB_NAME=ElectroStoreDB" >> .env
 echo "DB_USER=postgres" >> .env
 echo "DB_PASSWORD=postgres" >> .env
 echo "APP_HOST=0.0.0.0" >> .env
