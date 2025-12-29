@@ -59,9 +59,6 @@
                 <button onclick="exportQueryResults()" class="btn btn-success" style="flex: 1;">
                     <i class="fas fa-download"></i> Экспорт
                 </button>
-                <button onclick="explainQuery()" class="btn btn-secondary">
-                    <i class="fas fa-chart-line"></i> Анализ
-                </button>
                 <button onclick="clearQuery()" class="btn">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -100,16 +97,22 @@
             <div class="card-body">
                 <div class="d-flex flex-column gap-2">
                     <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('select_all')">
-                        <i class="fas fa-search"></i> SELECT * FROM таблица
+                        <i class="fas fa-search"></i> SELECT * FROM customers
                     </button>
-                    <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('select_where')">
-                        <i class="fas fa-filter"></i> SELECT с условием WHERE
+                    <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('select_where_array')">
+                        <i class="fas fa-filter"></i> SELECT с параметрами (массив)
+                    </button>
+                    <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('select_where_object')">
+                        <i class="fas fa-filter"></i> SELECT с параметрами (объект)
                     </button>
                     <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('join')">
-                        <i class="fas fa-link"></i> JOIN двух таблиц
+                        <i class="fas fa-link"></i> JOIN таблиц customers и orders
                     </button>
                     <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('aggregate')">
                         <i class="fas fa-calculator"></i> Агрегатные функции
+                    </button>
+                    <button class="btn btn-sm btn-secondary text-left" onclick="loadExample('complex_join')">
+                        <i class="fas fa-sitemap"></i> Сложный JOIN нескольких таблиц
                     </button>
                 </div>
             </div>
@@ -186,27 +189,40 @@ function toggleParamsType() {
     }
 }
 
+// ОБНОВЛЕННЫЕ ПРИМЕРЫ ДЛЯ НАШЕЙ СТРУКТУРЫ БД С РАБОЧИМИ ПАРАМЕТРАМИ
 function loadExample(type) {
     const examples = {
         select_all: {
-            query: "SELECT * FROM bookmarks LIMIT 100",
+            query: "SELECT * FROM customers LIMIT 100",
             params: "[]"
         },
-        select_where: {
-            query: "SELECT * FROM bookmarks WHERE category_id = 1 LIMIT 100",
-            params: "[]"
+        select_where_array: {
+            query: "SELECT * FROM products WHERE price > %s AND stock_quantity > %s ORDER BY price DESC LIMIT 20",
+            params: '[10000, 5]'
         },
-        select_params: {
-            query: "SELECT * FROM bookmarks WHERE category_id = %s AND created_at > %s",
-            params: '[1, "2024-01-01"]'
+        select_where_object: {
+            query: "SELECT * FROM orders WHERE is_paid = %(is_paid)s AND total_amount > %(min_amount)s ORDER BY order_date DESC LIMIT 15",
+            params: '{"is_paid": true, "min_amount": 50000}'
         },
         join: {
-            query: "SELECT b.*, c.name as category_name FROM bookmarks b JOIN categories c ON b.category_id = c.id LIMIT 50",
+            query: "SELECT o.*, c.first_name, c.last_name FROM orders o JOIN customers c ON o.customer_id = c.customer_id LIMIT 50",
             params: "[]"
         },
         aggregate: {
-            query: "SELECT category_id, COUNT(*) as count, AVG(LENGTH(title)) as avg_title_length FROM bookmarks GROUP BY category_id",
+            query: "SELECT c.customer_id, c.first_name || ' ' || c.last_name as customer_name, COUNT(o.order_id) as total_orders, SUM(o.total_amount) as total_spent FROM customers c LEFT JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_id, c.first_name, c.last_name ORDER BY total_spent DESC NULLS LAST",
             params: "[]"
+        },
+        complex_join: {
+            query: "SELECT o.order_id, o.order_date, c.first_name || ' ' || c.last_name as customer, p.product_name, oi.quantity, oi.total_price, o.total_amount FROM orders o JOIN customers c ON o.customer_id = c.customer_id JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id WHERE o.is_delivered = false ORDER BY o.order_date DESC LIMIT 50",
+            params: "[]"
+        },
+        customers_by_id_array: {
+            query: "SELECT * FROM customers WHERE customer_id IN (%s, %s, %s)",
+            params: '[1, 2, 3]'
+        },
+        products_by_price_range_object: {
+            query: "SELECT * FROM products WHERE price BETWEEN %(min_price)s AND %(max_price)s AND is_available = %(available)s ORDER BY price ASC",
+            params: '{"min_price": 10000, "max_price": 50000, "available": true}'
         }
     };
     
@@ -244,28 +260,21 @@ async function executeQuery() {
     const startTime = performance.now();
     
     try {
-        let paramsObj = {};
+        let paramsObj = [];
         if (params) {
             try {
-                paramsObj = JSON.parse(params);
+                const parsed = JSON.parse(params);
+                // Всегда преобразуем в массив
+                if (Array.isArray(parsed)) {
+                    paramsObj = parsed;
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                    // Для объекта всегда отправляем как есть - бэкенд сам разберется
+                    paramsObj = parsed;
+                }
             } catch (e) {
                 alert('Ошибка в формате параметров JSON: ' + e.message);
                 return;
             }
-        }
-        
-        const paramsType = document.querySelector('input[name="paramsType"]:checked').value;
-        let requestParams = {};
-        
-        if (paramsType === 'array' && Array.isArray(paramsObj)) {
-            paramsObj.forEach((value, index) => {
-                requestParams[index] = value;
-            });
-        } else if (paramsType === 'object' && typeof paramsObj === 'object' && !Array.isArray(paramsObj)) {
-            requestParams = paramsObj;
-        } else {
-            alert('Неверный формат параметров');
-            return;
         }
         
         const response = await fetch('/api/query/execute', {
@@ -273,7 +282,7 @@ async function executeQuery() {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: new URLSearchParams({
                 sql: sql,
-                params: JSON.stringify(requestParams)
+                params: JSON.stringify(paramsObj)
             })
         });
         
@@ -306,33 +315,26 @@ async function exportQueryResults() {
     }
     
     try {
-        let paramsObj = {};
+        let paramsObj = [];
         if (params) {
             try {
-                paramsObj = JSON.parse(params);
+                const parsed = JSON.parse(params);
+                // Всегда преобразуем в массив
+                if (Array.isArray(parsed)) {
+                    paramsObj = parsed;
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                    // Для объекта всегда отправляем как есть - бэкенд сам разберется
+                    paramsObj = parsed;
+                }
             } catch (e) {
                 alert('Ошибка в формате параметров JSON: ' + e.message);
                 return;
             }
         }
         
-        const paramsType = document.querySelector('input[name="paramsType"]:checked').value;
-        let requestParams = {};
-        
-        if (paramsType === 'array' && Array.isArray(paramsObj)) {
-            paramsObj.forEach((value, index) => {
-                requestParams[index] = value;
-            });
-        } else if (paramsType === 'object' && typeof paramsObj === 'object' && !Array.isArray(paramsObj)) {
-            requestParams = paramsObj;
-        } else {
-            alert('Неверный формат параметров');
-            return;
-        }
-        
         const formData = new FormData();
         formData.append('sql', sql);
-        formData.append('params', JSON.stringify(requestParams));
+        formData.append('params', JSON.stringify(paramsObj));
         formData.append('format', format);
         
         const response = await fetch('/api/query/export', {
@@ -368,80 +370,6 @@ async function exportQueryResults() {
     } catch (e) {
         alert('Ошибка: ' + e.message);
     }
-}
-
-async function explainQuery() {
-    const sql = document.getElementById('sqlQuery').value.trim();
-    
-    if (!sql) {
-        alert('Введите SQL запрос');
-        return;
-    }
-    
-    const explainSql = 'EXPLAIN (FORMAT JSON) ' + sql;
-    
-    try {
-        const response = await fetch('/api/query/execute', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: new URLSearchParams({
-                sql: explainSql,
-                params: '{}'
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success && result.data && result.data[0]) {
-            const explainData = result.data[0]['QUERY PLAN'];
-            let explainText = '';
-            
-            try {
-                const plan = JSON.parse(explainData);
-                explainText = formatExplainPlan(plan[0]['Plan']);
-            } catch (e) {
-                explainText = explainData;
-            }
-            
-            document.getElementById('explainResults').innerHTML = `
-                <div style="background: var(--bg-primary); padding: 16px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap;">
-                    ${explainText}
-                </div>
-            `;
-            document.getElementById('queryInfo').style.display = 'block';
-        } else {
-            alert('Не удалось получить план выполнения запроса');
-        }
-    } catch (e) {
-        alert('Ошибка: ' + e.message);
-    }
-}
-
-function formatExplainPlan(plan, indent = 0) {
-    let result = '';
-    const spaces = '  '.repeat(indent);
-    
-    result += `${spaces}${plan['Node Type']}\n`;
-    
-    if (plan['Relation Name']) {
-        result += `${spaces}  Таблица: ${plan['Relation Name']}\n`;
-    }
-    
-    if (plan['Total Cost']) {
-        result += `${spaces}  Стоимость: ${plan['Total Cost']}\n`;
-    }
-    
-    if (plan['Plan Rows']) {
-        result += `${spaces}  Ожидаемое строк: ${plan['Plan Rows']}\n`;
-    }
-    
-    if (plan['Plans'] && Array.isArray(plan['Plans'])) {
-        plan['Plans'].forEach(subPlan => {
-            result += formatExplainPlan(subPlan, indent + 1);
-        });
-    }
-    
-    return result;
 }
 
 function showQueryStats(result) {

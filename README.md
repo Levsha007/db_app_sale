@@ -26,6 +26,16 @@ echo "DB_PASSWORD=postgres" >> .env
 echo "APP_HOST=0.0.0.0" >> .env
 echo "APP_PORT=3000" >> .env
 
+или
+
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=ElectroStoreDB
+DB_USER=postgres
+DB_PASSWORD=postgres
+APP_HOST=0.0.0.0
+APP_PORT=3000
+
 # В папке app:
 cp .env app/.env
 

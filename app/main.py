@@ -268,6 +268,8 @@ async def query_builder(request: Request):
             "tables": []
         })
 
+import re
+
 @app.post("/api/query/execute")
 async def execute_query(
     sql: str = Form(...),
@@ -276,15 +278,34 @@ async def execute_query(
     """Выполнить SQL запрос с параметрами"""
     try:
         # Парсим параметры
-        params_dict = {}
+        params_list = []
         if params and params.strip():
             try:
-                params_dict = json.loads(params)
+                parsed_params = json.loads(params)
+                
+                # Всегда преобразуем в список параметров
+                if isinstance(parsed_params, dict):
+                    # Если это словарь с числовыми ключами ("0", "1", "2")
+                    param_keys = sorted([k for k in parsed_params.keys() if k.isdigit()], key=int)
+                    if param_keys:
+                        # Создаем список в правильном порядке
+                        for key in param_keys:
+                            params_list.append(parsed_params[key])
+                    else:
+                        # Именованные параметры - преобразуем в список по порядку
+                        # Находим все именованные параметры в запросе
+                        named_params = re.findall(r'%\((\w+)\)s', sql)
+                        for param_name in named_params:
+                            if param_name in parsed_params:
+                                params_list.append(parsed_params[param_name])
+                elif isinstance(parsed_params, list):
+                    params_list = parsed_params
+                    
             except json.JSONDecodeError as e:
                 return {"success": False, "error": f"Ошибка в формате параметров JSON: {str(e)}"}
         
         # Выполняем запрос
-        result = db.execute_query(sql, params_dict)
+        result = db.execute_query(sql, tuple(params_list) if params_list else None)
         
         return {
             "success": True,
@@ -303,15 +324,34 @@ async def export_query_result(
     """Экспорт результатов SQL запроса"""
     try:
         # Парсим параметры
-        params_dict = {}
+        params_list = []
         if params and params.strip():
             try:
-                params_dict = json.loads(params)
+                parsed_params = json.loads(params)
+                
+                # Всегда преобразуем в список параметров
+                if isinstance(parsed_params, dict):
+                    # Если это словарь с числовыми ключами ("0", "1", "2")
+                    param_keys = sorted([k for k in parsed_params.keys() if k.isdigit()], key=int)
+                    if param_keys:
+                        # Создаем список в правильном порядке
+                        for key in param_keys:
+                            params_list.append(parsed_params[key])
+                    else:
+                        # Именованные параметры - преобразуем в список по порядку
+                        # Находим все именованные параметры в запросе
+                        named_params = re.findall(r'%\((\w+)\)s', sql)
+                        for param_name in named_params:
+                            if param_name in parsed_params:
+                                params_list.append(parsed_params[param_name])
+                elif isinstance(parsed_params, list):
+                    params_list = parsed_params
+                    
             except json.JSONDecodeError as e:
                 return {"success": False, "error": f"Ошибка в формате параметров JSON: {str(e)}"}
         
         # Выполняем запрос
-        result = db.execute_query(sql, params_dict)
+        result = db.execute_query(sql, tuple(params_list) if params_list else None)
         
         if not result:
             return {"success": False, "error": "Нет данных для экспорта"}
